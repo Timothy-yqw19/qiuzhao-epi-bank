@@ -9,3 +9,5 @@ __pycache__/
 data/zhenti.json
 .db_tmp/
 zhenti.local.html
+data/img/
+data/graphic_index.json

@@ -14,6 +14,7 @@ const EXPECT_GEN = genData.questions.length, EXPECT_TOTAL = 134 + EXPECT_GEN;
 const N_GEN_STUB = EXPECT_GEN;
 const zhentiPath = path.join(__dirname, "data", "zhenti.json");
 const ZHENTI = fs.existsSync(zhentiPath) ? JSON.parse(fs.readFileSync(zhentiPath, "utf8")) : null;
+const ZH_COUNT = ZHENTI ? ZHENTI.questions.length : 0;
 
 /* ---------- 取出应用脚本 ---------- */
 const blocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
@@ -73,12 +74,14 @@ const factory = new Function(
            getFresh:()=>freshQs, getQS:()=>QS, refreshNew, clearFresh, MAX_FRESH, BY_ID_GET:(id)=>BY_ID[id],
            getTimer:()=>S.timer, timerInit, timerAdvance, timerToggle, timerReset, timerSkip, timerPreset, timerChipText, todayStr,
            loadZhenti, getZhenti:()=>zhentiQs, zhentiHint, isLocalHost,
+           rushCfg, rushOn, rushSecs, rushTimeout, getRushQid:()=>rushQid,
            setZhentiState:(v)=>{zhentiState=v}, getZhentiState:()=>zhentiState,
            setHost:(h)=>{location.hostname=h}, setProto:(pr)=>{location.protocol=pr},
            wrongList:()=>Object.keys(S.rec).filter(isWrong).map(Number)};`
 );
 const app = factory(document, window, localStorage, function () {}, { createObjectURL: () => "", revokeObjectURL: () => {} },
   function () {}, () => {}, () => true, () => {}, location, history, navigator);
+const saveForce = () => app.save(true);
 const fireHash = () => (winListeners["hashchange"] || []).forEach((f) => f());
 
 /* ---------- 断言框架 ---------- */
@@ -351,20 +354,20 @@ app.go("list");
 console.log("五之六、本机真题库（仅本地导入，不进公开站点）");
 ok(!!ZHENTI, "存在 data/zhenti.json（本地导入的真题）");
 if (ZHENTI) {
-  ok(ZHENTI.questions.length === 1500, "真题 1500 题", ZHENTI.questions.length);
+  ok(ZH_COUNT > 2500, "真题库已扩充到 " + ZH_COUNT + " 题（原 1500）", ZH_COUNT);
   ok(/仅供个人学习/.test(ZHENTI.meta.licenseNote), "数据自带版权/使用范围说明", ZHENTI.meta.licenseNote.slice(0, 24));
   const beforeZ = app.getQS().length;
   app.loadZhenti(ZHENTI.questions);
-  ok(app.getQS().length === beforeZ + 1500, "全库扩到 " + app.getQS().length + " 题");
+  ok(app.getQS().length === beforeZ + ZH_COUNT, "全库扩到 " + app.getQS().length + " 题");
   const Z = app.getQS().filter((q) => q.src === "zhenti");
-  ok(Z.length === 1500, "真题池已并入题库", Z.length);
+  ok(Z.length === ZH_COUNT, "真题池已并入题库", Z.length);
   ok(Z.every((q) => q.options.length === 4 && new Set(q.options.map((o) => o.t)).size === 4), "真题每题 4 个不重复选项");
   ok(Z.every((q) => q.options.some((o) => o.k === q.answer)), "真题答案都在选项中");
   ok(Z.every((q) => q.analysis && q.analysis.length > 10), "真题都带解析");
   ok(Z.every((q) => q.id >= 300001), "真题号段独立（300001 起，不与原题/生成题冲突）");
   ok(new Set(app.getQS().map((q) => q.id)).size === app.getQS().length, "并入后题号仍全局唯一");
   const zt = {}; Z.forEach((q) => { zt[q.topic] = (zt[q.topic] || 0) + 1; });
-  ok(Object.keys(zt).length === 8, "覆盖 8 个题型（正是无法机器生成的那几类）", zt);
+  ok(Object.keys(zt).length === 11, "覆盖 11 个题型（含原先缺失的图形/数量/资料）", zt);
   ok(Z.some((q) => q.topic === "政治理论"), "带来新模块：政治理论");
   ok(app.selIds({ k: "t", t: "逻辑填空" }).length >= 200, "可按题型单独刷真题", app.selIds({ k: "t", t: "逻辑填空" }).length);
   ok(app.selIds({ k: "all", orig: true }).length === 134, "21 天计划仍只跑手写原题（不被真题稀释）", app.selIds({ k: "all", orig: true }).length);
@@ -421,13 +424,49 @@ if (fs.existsSync(localFile)) {
   ok(!!m, "内嵌版能取出题库数据");
   const lb = JSON.parse(m[1]);
   ok(lb.meta.zhentiInlined === true, "内嵌版带 zhentiInlined 标记（启动时不再去 fetch）");
-  ok(lb.questions.filter((q) => q.src === "zhenti").length === 1500, "内嵌版含 1500 道真题",
+  ok(lb.questions.filter((q) => q.src === "zhenti").length === ZH_COUNT, "内嵌版含 " + ZH_COUNT + " 道真题",
     lb.questions.filter((q) => q.src === "zhenti").length);
-  ok(lb.questions.length === EXPECT_TOTAL + 1500, "内嵌版题目总数 = " + (EXPECT_TOTAL + 1500), lb.questions.length);
+  ok(lb.questions.length === EXPECT_TOTAL + ZH_COUNT, "内嵌版题目总数 = " + (EXPECT_TOTAL + ZH_COUNT), lb.questions.length);
   ok(!/const BANK[\s\S]*"src":"zhenti"[\s\S]*?\nconst APPENDIX/.test(html) === false || true, "公网版与内嵌版是两个独立产物");
 }
 ok(!/zhentiInlined":true/.test(html.replace(/\s/g, "")), "公网 index.html 未内嵌真题");
 ok(/"zhenti":/.test(html) || /"src":"zhenti"/.test(html) === false, "公网 index.html 不含真题数据（仅含加载逻辑）");
+
+console.log("五之八、难度分层 / 配图 / 测评限时（针对『题太简单』）");
+const Z2 = app.getQS().filter((q) => q.src === "zhenti");
+ok(Z2.every((q) => q.diff === 1 || q.diff === 2 || q.diff === 3), "每道真题都有难度档");
+const dc = { 1: 0, 2: 0, 3: 0 };
+Z2.forEach((q) => { dc[q.diff]++; });
+ok(dc[3] > 800 && dc[1] > 800, "三档难度都有足够题量（易" + dc[1] + "/中" + dc[2] + "/难" + dc[3] + "）", dc);
+const gk = Z2.filter((q) => /国考|国家公务员|中央机关/.test(q.paper || "")).length;
+ok(gk / Z2.length > 0.25, "国考（更难）占比升到 " + Math.round(gk / Z2.length * 100) + "%", gk);
+const withImg = Z2.filter((q) => q.img);
+ok(withImg.length > 400, "带配图的图形推理 " + withImg.length + " 道", withImg.length);
+ok(withImg.every((q) => fs.existsSync(path.join(__dirname, q.img))), "配图文件都在本地（可离线）");
+const withMat = Z2.filter((q) => q.materialHtml);
+ok(withMat.length > 30, "带材料的资料分析 " + withMat.length + " 道", withMat.length);
+// 练习页要真的渲染出图片
+app.startSet([withImg[0].id], { label: "IMG" });
+const pImg = viewHtml("v-practice");
+ok(/<img src="data\/img\//.test(pImg), "练习页用 <img> 渲染配图（而不是当文本转义）");
+ok(pImg.includes("难") || pImg.includes("中") || pImg.includes("易"), "练习页显示难度标签");
+// 难度筛选
+app.go("list");
+ok(count(viewHtml("grid"), /class="qcard"/g) === app.getQS().length, "题库页默认展示全部题");
+// 测评限时：默认关闭
+ok(app.rushOn() === false, "测评限时默认关闭（45 秒/题可选）");
+app.rushCfg().secs = 45;
+ok(app.rushOn() === true && app.rushSecs() === 45, "可开启 45 秒/题");
+app.startSet([300001, 300002], { label: "RUSH" });
+ok(app.getRushQid() > 0, "进入题目后开始本题倒计时");
+const r0 = app.R(300001);
+app.rushTimeout();
+ok(r0.timeout === true && r0.correct === false && r0.wrong >= 1, "超时记为错并进入错题本");
+ok(app.getCur().id === 300002, "超时后自动跳到下一题", app.getCur().id);
+ok(((app.getS().ui || {}).rushTimeouts || 0) >= 1, "超时次数计入统计");
+ok(app.isWrong(300001) === true, "超时的题会被错题本收录");
+app.rushCfg().secs = 0; saveForce();
+app.go("list");
 
 console.log("六、网址路由（做成网站后的地址栏行为）");
 ok(app.getView() === "list", "启动后默认在题库页");

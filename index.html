@@ -101,6 +101,9 @@ button.btn:disabled{opacity:.45;cursor:not-allowed}
 .md-table th{background:#f2f4f7;font-weight:600}
 .fig{margin:6px 0 14px;text-align:center}
 .fig svg{max-width:100%;height:auto}
+.fig img{max-width:100%;height:auto;border-radius:8px;background:#fff}
+#rushTimer{font-weight:700}
+#rushTimer.hot{color:var(--bad)}
 .stem{font-size:16px;line-height:1.85;white-space:pre-wrap;margin-bottom:14px}
 .stem strong{color:var(--ink);background:linear-gradient(transparent 62%,#ffe9a8 62%)}
 .opts{display:flex;flex-direction:column;gap:8px}
@@ -825,6 +828,11 @@ const isBuilt = q => q.src==="gen";
 const isFresh = q => q.src==="fresh";
 const isZhenti = q => q.src==="zhenti";
 const isGen   = q => isBuilt(q) || isFresh(q);   // 「程序生成」的统称
+const diffName = d => d===3?"难":d===2?"中":d===1?"易":"";
+function diffChip(q){ const d=q.diff; if(!d) return ''; return '<span class="chip '+(d===3?"bad":d===2?"acc":"")+'">'+diffName(d)+'</span>'; }
+function rushCfg(){ S.ui=S.ui||{}; S.ui.rush=S.ui.rush||{secs:0}; return S.ui.rush; }
+const rushOn = () => rushCfg().secs>0;
+const rushSecs = () => rushCfg().secs||0;
 
 let freshQs = [], freshSeq = 900000;
 let zhentiQs = [];                                // 本机导入的真题（公网站点载入不到，会自动跳过）
@@ -1082,9 +1090,28 @@ function renderTimer(){
     b.onclick=function(){ const a=b.dataset.preset.split(","); timerPreset(Number(a[0]), Number(a[1])); };
   });
 }
+function rushTimeout(){
+  const q=cur(); if(!q) return;
+  const r=R(q.id); if(r.picked) return;
+  const prevWrong = r.correct===false;
+  r.timeout=true; r.correct=false; r.tries=(r.tries||0)+1;
+  if(!prevWrong) r.wrong=(r.wrong||0)+1;
+  r.ts=Date.now();
+  S.ui.rushTimeouts=(S.ui.rushTimeouts||0)+1;
+  save(true); renderTabs();
+  toast("超时，本题记为错 → 下一题");
+  rushQid=0; rushDeadline=0;
+  next(1);
+}
 function timerTick(){                     // 每秒调用；用墙钟差值，后台标签页被节流也不会走慢
   const T=S.timer; if(!T) return;
   if(T.running){ const now=Date.now(); const dt=Math.min(Math.max(0,now-(T.lastAt||now)), 60000); if(dt>0) timerAdvance(dt); }
+  if(rushOn() && rushQid && view==="practice"){
+    const left=rushDeadline-Date.now();
+    const el=document.getElementById("rushTimer");
+    if(el){ el.textContent="⏱ "+fmtMS(Math.max(0,left)); el.classList.toggle("hot", left<=10000); }
+    if(left<=0){ rushTimeout(); return; }
+  }
   const chip=document.getElementById("timerChip");
   if(chip){ chip.textContent=timerChipText(); chip.className=T.running?"run":""; }
   if(view==="timer"){                                  // 计时页只更新数字，避免整页重绘
@@ -1174,6 +1201,7 @@ function applyRoute(){
 /* ---------------- 练习状态 ---------------- */
 let queue=[], idx=0, showTip=false, showAna=false, examMode=false;
 let setLimitMs=0, setRemainMs=0, tick=null, qStart=0, activeQid=null, finished=false;
+let rushQid=0, rushDeadline=0;      // 测评限时：当前题的截止时间
 
 /* 把当前题的用时落账，切换题目/离开练习页前调用 */
 function bankTime(){
@@ -1224,6 +1252,8 @@ function renderPractice(){
       +'<button class="btn" onclick="startSet(QS.filter(q=>!S.rec[q.id]||!S.rec[q.id].picked).map(q=>q.id),{label:\'未做题\'})">只做没做过的</button>'
       +'</div>'
       +'<div class="row" style="margin-top:10px">'
+      +'<button class="btn primary" onclick="startRush(20)">⏱ 测评模式（20 题 · 45 秒/题）</button>'
+      +'<button class="btn" onclick="startHard(30)">只练难题（30 题）</button>'
       +'<button class="btn primary" onclick="refreshNew(20)">🔄 一键刷新 20 道新题</button>'
       +'<button class="btn" onclick="refreshNew(50)">刷新 50 道</button>'
       +'<button class="btn" onclick="refreshNew(100)">刷新 100 道</button>'
@@ -1246,17 +1276,23 @@ function renderPractice(){
   box.innerHTML =
    '<div class="pbar">'
    +'<span class="chip acc">'+(q.module===q.topic?esc(q.module):esc(q.module)+' · '+esc(q.topic))+'</span>'
+   +diffChip(q)
+   +(q.origin?'<span class="chip">'+esc(q.origin)+'</span>':'')
    +'<span class="no" style="font-weight:700">第 '+q.id+' 题</span>'
    +'<span class="muted">本组 '+(idx+1)+'/'+queue.length+(setLimitMs?' · <span class="timer" id="setTimer"></span>':'')+'</span>'
    +'<span class="spacer"></span>'
    +'<button class="btn '+(examMode?"on":"")+'" id="modeBtn">'+(examMode?"考试模式":"练习模式")+'</button>'
    +'<button class="btn '+(r.fav?"on":"")+'" id="favBtn">'+(r.fav?"★ 已收藏":"☆ 收藏")+'</button>'
    +'<button class="btn '+(r.doubt?"on":"")+'" id="doubtBtn">'+(r.doubt?"? 存疑":"? 标记存疑")+'</button>'
+   +'<select id="rushSel" title="测评限时：每题倒计时，超时自动记为错并跳到下一题"><option value="0">不限时</option>'
+   +[30,40,45,60].map(x=>'<option value="'+x+'"'+(rushOn()&&rushSecs()===x?" selected":"")+'>'+x+' 秒/题</option>').join("")+'</select>'
    +'<span class="timer muted" id="qTimer">本题 0:00</span>'
+   +(rushOn()?'<span class="timer" id="rushTimer">⏱ --</span>':'')
    +'</div>'
    +'<div class="qbody">'
    +(q.materialHtml?'<div class="material"><div class="mtitle">'+esc(q.materialTitle)+'　<span class="chip" id="matToggle" style="cursor:pointer">收起材料</span></div><div id="matBody">'+q.materialHtml+'</div></div>':'')
    +(q.svg?'<div class="fig">'+q.svg+'</div>':'')
+   +(q.img?'<div class="fig"><img src="'+esc(q.img)+'" alt="题目配图"></div>':'')
    +(isZhenti(q)&&(q.origin||q.paper)?'<div class="muted" style="margin:-6px 0 10px">来源：'+esc([q.origin,q.paper].filter(Boolean).join(" · "))+'</div>':'')
    +'<div class="stem">'+mdEsc(q.stem)+'</div>'
    +'<div class="opts">'+q.options.map(o=>'<button class="'+optCls(o)+'" data-k="'+o.k+'"><span class="k">'+o.k+'</span><span>'+esc(o.t)+'</span></button>').join("")+'</div>'
@@ -1288,6 +1324,8 @@ function renderPractice(){
   $("#tipBtn").onclick=()=>{ showTip=!showTip; renderPractice(); };
   $("#anaBtn").onclick=()=>{ showAna=!showAna; renderPractice(); };
   $("#modeBtn").onclick=()=>{ examMode=!examMode; renderPractice(); };
+  const rs=$("#rushSel");
+  if(rs) rs.onchange=()=>{ rushCfg().secs=Number(rs.value); rushQid=0; rushDeadline=0; save(true); renderPractice(); };
   $("#favBtn").onclick=()=>{ r.fav=!r.fav; save(); renderPractice(); };
   $("#doubtBtn").onclick=()=>{ r.doubt=!r.doubt; save(); renderPractice(); };
   const mb=$("#submitBtn"); if(mb) mb.onclick=finishSet;
@@ -1304,6 +1342,8 @@ function renderPractice(){
   };
   const st=$("#setTimer"); if(st&&setLimitMs) st.textContent="组卷剩余 "+fmtClock(setRemainMs);
   activeQid=q.id; qStart=Date.now();
+  if(rushOn() && !r.picked){ if(rushQid!==q.id){ rushQid=q.id; rushDeadline=Date.now()+rushSecs()*1000; } }
+  else { rushQid=0; rushDeadline=0; }
   try{ if(location.hash!=="#/practice/"+q.id) history.replaceState(null,"","#/practice/"+q.id); }catch(e){}
   if(timerEl) clearInterval(timerEl);
   timerEl=setInterval(()=>{ const e=$("#qTimer"); if(e) e.textContent="本题 "+fmtClock(Date.now()-qStart); },500);
@@ -1314,7 +1354,8 @@ function pick(k){
   if(r.picked && !examMode) return;          // 练习模式已答，锁住避免误触
   if(r.picked===null) r.tries=(r.tries||0)+1;
   const prevWrong = r.correct===false;
-  r.picked=k; r.correct=(k===q.answer);
+  r.picked=k; r.correct=(k===q.answer); r.timeout=false;
+  rushQid=0; rushDeadline=0;
   if(!r.correct && !prevWrong) r.wrong=(r.wrong||0)+1;   // 错误次数只累加，用于错题本
   r.ts=Date.now();
   save(); renderTabs();
@@ -1353,11 +1394,25 @@ function jump(id){
   if(i<0){ queue=QS.map(q=>q.id); idx=queue.indexOf(id); if(idx<0){ queue=[id]; idx=0; } } else idx=i;
   showTip=showAna=false; go("practice");
 }
+function startRush(n){
+  rushCfg().secs=45; save(true);
+  const pool=QS.filter(q=>!isGen(q)).map(q=>q.id);          // 测评练习优先真题/原题
+  startSet(selIds({k:"rand",n:n}), {label:"测评模式 "+n+" 题"});
+  toast("测评模式：每题 45 秒，超时自动记为错");
+}
+function startHard(n){
+  const hard=QS.filter(q=>q.diff===3 && isZhenti(q)).map(q=>q.id);
+  const pool=hard.length>=n ? hard : QS.filter(q=>q.diff===3).map(q=>q.id);
+  if(!pool.length) return toast("还没有难度标签，先导入真题库");
+  for(let i=pool.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[pool[i],pool[j]]=[pool[j],pool[i]];}
+  rushCfg().secs=0; save(true);
+  startSet(pool.slice(0,n), {label:"只练难题 "+Math.min(n,pool.length)+" 题"});
+}
 function startRandom(n){ const a=QS.map(q=>q.id); for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]];} startSet(a.slice(0,n),{label:"随机 "+n+" 题"}); }
 function startWrong(){ const ids=Object.keys(S.rec).filter(isWrong).map(Number).sort((a,b)=>a-b); if(!ids.length){ toast("错题本是空的，先做几组题"); return; } startSet(ids,{label:"错题重练"}); }
 
 /* ---------------- 题库列表 ---------------- */
-let fModule="", fTopic="", fState="", fText="", fSrc="";
+let fModule="", fTopic="", fState="", fText="", fSrc="", fDiff="";
 function renderList(){
   const modes=[["","全部"],["none","未做"],["bad","做错的"],["fav","收藏"],["doubt","存疑"],["note","有笔记"],["ana","无解析"]];
   const srcs=[["","全部来源"],["orig","仅原题（"+N_ORIG+"）"],["gen","构建期生成（"+N_GEN+"）"],["fresh","本机新生成（"+N_FRESH+"）"]];
@@ -1367,8 +1422,10 @@ function renderList(){
    +'<select id="fm"><option value="">全部模块</option>'+MODULES.map(m=>'<option '+(fModule===m?"selected":"")+'>'+esc(m)+'</option>').join("")+'</select>'
    +'<select id="ft"><option value="">全部题型</option>'+TOPICS.map(t=>'<option '+(fTopic===t?"selected":"")+'>'+esc(t)+'</option>').join("")+'</select>'
    +'<select id="fs">'+srcs.map(([v,t])=>'<option value="'+v+'" '+(fSrc===v?"selected":"")+'>'+esc(t)+'</option>').join("")+'</select>'
-   +'<input type="search" id="fq" placeholder="搜索题干关键词，如 比重 / 数列 / 工程" style="min-width:200px" value="'+esc(fText)+'">'
+   +'<select id="fd"><option value="">全部难度</option><option value="3" '+(fDiff==="3"?"selected":"")+'>难（'+QS.filter(q=>q.diff===3).length+'）</option><option value="2" '+(fDiff==="2"?"selected":"")+'>中（'+QS.filter(q=>q.diff===2).length+'）</option><option value="1" '+(fDiff==="1"?"selected":"")+'>易（'+QS.filter(q=>q.diff===1).length+'）</option></select>'
+   +'<input type="search" id="fq" placeholder="搜索题干关键词，如 比重 / 数列 / 工程" style="min-width:180px" value="'+esc(fText)+'">'
    +'<span class="spacer"></span>'
+   +'<button class="btn" id="hardOnly" title="只筛难题">只练难题</button>'
    +'<button class="btn primary" id="startFiltered">开始这一组</button>'
    +'</div>'
    +'<div class="row" style="margin-top:10px">'+modes.map(([k,t])=>'<button class="btn '+(fState===k?"on":"")+'" data-st="'+k+'">'+t+'</button>').join("")+'</div>'
@@ -1377,8 +1434,9 @@ function renderList(){
    +'<span class="muted">· 原题 '+N_ORIG+' 道为手写真题/仿真题；构建期生成 '+N_GEN+' 道；本机新生成 '+N_FRESH+' 道（上限 '+MAX_FRESH+'）'+(N_ZHENTI?'；真题库 '+N_ZHENTI+' 道（本机导入）':'')+'</span></div>'
    +zhentiHint()
    +'<div class="grid" id="grid"></div>';
-  const rebuild=()=>{ fModule=$("#fm").value; fTopic=$("#ft").value; fSrc=$("#fs").value; fText=$("#fq").value.trim(); drawGrid(); };
-  $("#fm").onchange=rebuild; $("#ft").onchange=rebuild; $("#fs").onchange=rebuild;
+  const rebuild=()=>{ fModule=$("#fm").value; fTopic=$("#ft").value; fSrc=$("#fs").value; fDiff=$("#fd").value; fText=$("#fq").value.trim(); drawGrid(); };
+  $("#fm").onchange=rebuild; $("#ft").onchange=rebuild; $("#fs").onchange=rebuild; $("#fd").onchange=rebuild;
+  const ho=$("#hardOnly"); if(ho) ho.onclick=()=>{ fDiff="3"; fState=""; renderList(); };
   let qt=null; $("#fq").oninput=()=>{ clearTimeout(qt); qt=setTimeout(rebuild,180); };
   $$("[data-st]").forEach(b=>b.onclick=()=>{ fState=b.dataset.st; renderList(); });
   $("#startFiltered").onclick=()=>{ const ids=filtered().map(q=>q.id); if(!ids.length) return toast("这组筛选结果为空"); startSet(ids,{label:"筛选组"}); };
@@ -1392,6 +1450,7 @@ function filtered(){
     if(fSrc==="gen" && !isBuilt(q)) return false;
     if(fSrc==="fresh" && !isFresh(q)) return false;
     if(fSrc==="zhenti" && !isZhenti(q)) return false;
+    if(fDiff && String(q.diff||0)!==fDiff) return false;
     if(fText && !(q.stem+" "+q.options.map(o=>o.t).join(" ")+" "+q.tip).includes(fText)) return false;
     const r=S.rec[q.id]||{};
     if(fState==="none" && r.picked) return false;
@@ -1412,7 +1471,7 @@ function drawGrid(){
     return '<div class="qcard" data-id="'+q.id+'">'
       +'<div class="top">'+dot+'<span class="no">'+q.id+'</span><span class="chip">'+esc(q.topic)+'</span>'
       +(isZhenti(q)?'<span class="chip warn">真题</span>':isFresh(q)?'<span class="chip ok">新生成</span>':isBuilt(q)?'<span class="chip acc">生成</span>':'')
-      +(q.svg?'<span class="chip">图</span>':'')+(q.analysis?'':'<span class="chip warn">无解析</span>')
+      +(q.svg||q.img?'<span class="chip">图</span>':'')+diffChip(q)+(q.analysis?'':'<span class="chip warn">无解析</span>')
       +(r.fav?'<span class="chip ok">★</span>':'')+(r.doubt?'<span class="chip warn">?</span>':'')+'</div>'
       +'<div class="stem">'+esc(stemText(q))+'</div>'
       +'<div class="bot">'+(r.picked?'<span class="chip '+(st==="ok"?"ok":"bad")+'">已答 '+r.picked+'</span>':'<span class="chip">未做</span>')
@@ -1633,6 +1692,7 @@ function renderData(){
    +'<div class="stat"><b>'+acc(doneGen)+'</b><span>生成题正确率（'+doneGen.length+'/'+(N_GEN+N_FRESH)+'）</span></div>'
    +'<div class="stat"><b>'+N_FRESH+'</b><span>本机刷新题（上限 '+MAX_FRESH+'）</span></div>'
    +'<div class="stat"><b>'+N_ZHENTI+'</b><span>本机真题库</span></div>'
+   +'<div class="stat"><b>'+((S.ui&&S.ui.rushTimeouts)||0)+'</b><span>测评模式超时次数</span></div>'
    +'<div class="stat"><b>'+fmtDur((S.timer&&S.timer.todayMs)||0)+'</b><span>今日专注时长</span></div>'
    +'<div class="stat"><b>'+fmtDur((S.timer&&S.timer.totalMs)||0)+'</b><span>累计专注时长</span></div>'
    +'</div></div>'
