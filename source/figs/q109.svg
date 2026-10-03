@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="666" height="260" viewBox="0 0 1000 390" font-family="Helvetica,Arial,sans-serif">
+<rect x="20.0" y="30.0" width="172" height="140" rx="8" fill="#fcfcfc" stroke="#dcdcdc"/>
+<polygon points="106.0,58.0 66.1,131.5 145.9,131.5" fill="none" stroke="#1a1a1a" stroke-width="2.4" stroke-linejoin="round"/>
+<rect x="202.0" y="30.0" width="172" height="140" rx="8" fill="#fcfcfc" stroke="#dcdcdc"/>
+<rect x="250.2" y="76.9" width="75.6" height="46.2" fill="none" stroke="#1a1a1a" stroke-width="2.4"/>
+<rect x="384.0" y="30.0" width="172" height="140" rx="8" fill="#fcfcfc" stroke="#dcdcdc"/>
+<polygon points="470.0,58.0 506.4,121.0 433.6,121.0" fill="none" stroke="#1a1a1a" stroke-width="2.4" stroke-linejoin="round"/>
+<rect x="566.0" y="30.0" width="172" height="140" rx="8" fill="#fcfcfc" stroke="#dcdcdc"/>
+<polygon points="681.7,129.7 622.3,129.7 622.3,70.3 681.7,70.3" fill="none" stroke="#1a1a1a" stroke-width="2.4" stroke-linejoin="round"/>
+<rect x="748.0" y="30.0" width="172" height="140" rx="8" fill="#fcfcfc" stroke="#dcdcdc"/>
+<text x="834.0" y="110.0" font-size="30" text-anchor="middle" fill="#999">?</text>
+<rect x="141.0" y="215.0" width="172" height="140" rx="8" fill="#fcfcfc" stroke="#dcdcdc"/>
+<polygon points="227.0,243.0 266.9,272.0 251.7,319.0 202.3,319.0 187.1,272.0" fill="none" stroke="#1a1a1a" stroke-width="2.4" stroke-linejoin="round"/>
+<text x="227.0" y="207.0" font-size="16" text-anchor="middle" fill="#666">A</text>
+<rect x="323.0" y="215.0" width="172" height="140" rx="8" fill="#fcfcfc" stroke="#dcdcdc"/>
+<polygon points="409.0,243.0 445.4,264.0 445.4,306.0 409.0,327.0 372.6,306.0 372.6,264.0" fill="none" stroke="#1a1a1a" stroke-width="2.4" stroke-linejoin="round"/>
+<text x="409.0" y="207.0" font-size="16" text-anchor="middle" fill="#666">B</text>
+<rect x="505.0" y="215.0" width="172" height="140" rx="8" fill="#fcfcfc" stroke="#dcdcdc"/>
+<circle cx="591.0" cy="285.0" r="37.8" fill="none" stroke="#1a1a1a" stroke-width="2.4"/>
+<text x="591.0" y="207.0" font-size="16" text-anchor="middle" fill="#666">C</text>
+<rect x="687.0" y="215.0" width="172" height="140" rx="8" fill="#fcfcfc" stroke="#dcdcdc"/>
+<polygon points="773.0,243.0 809.4,306.0 736.6,306.0" fill="none" stroke="#1a1a1a" stroke-width="2.4" stroke-linejoin="round"/>
+<text x="773.0" y="207.0" font-size="16" text-anchor="middle" fill="#666">D</text>
+</svg>

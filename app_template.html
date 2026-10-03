@@ -1,0 +1,796 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>秋招行测题库 · 银行 EPI 行测刷题</title>
+<meta name="description" content="秋招行测在线题库：134 道银行 EPI 真题/仿真题，每题带破题技巧与逐步解析，支持随时记录自己的解题思路、错题本与 21 天刷题计划。">
+<meta name="theme-color" content="#2f6df6">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="行测题库">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<style>
+:root{
+  --bg:#f5f6f8; --card:#fff; --line:#e5e7eb; --ink:#1f2328; --ink2:#5b6472; --ink3:#8b94a3;
+  --acc:#2f6df6; --acc-soft:#eaf0ff; --ok:#15a34a; --ok-soft:#e8f7ee; --bad:#dc2626; --bad-soft:#fdecec;
+  --warn:#c2740a; --warn-soft:#fdf3e3; --radius:14px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--ink);
+  font:15px/1.7 system-ui,-apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--acc)}
+header{
+  position:sticky; top:0; z-index:50; background:rgba(255,255,255,.94); backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--line);
+}
+.hd{max-width:1120px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.brand{font-weight:700;font-size:17px;letter-spacing:.3px}
+.brand .sub{font-weight:400;font-size:12px;color:var(--ink3);margin-left:6px}
+nav{display:flex;gap:4px;flex-wrap:wrap;margin-left:auto}
+nav button{
+  border:0;background:transparent;color:var(--ink2);padding:6px 11px;border-radius:9px;
+  font-size:13.5px;cursor:pointer;font-family:inherit;white-space:nowrap;
+}
+nav button:hover{background:#eef0f3;color:var(--ink)}
+nav button.on{background:var(--acc);color:#fff}
+main{max-width:1120px;margin:0 auto;padding:18px 16px 80px}
+.view{display:none}
+.view.on{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;margin-bottom:14px}
+h2{font-size:17px;margin:0 0 12px}
+h3{font-size:15px;margin:18px 0 8px;color:var(--ink)}
+.muted{color:var(--ink3);font-size:13px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.spacer{flex:1}
+select,input[type=text],input[type=search],textarea{
+  font:inherit;font-size:14px;color:var(--ink);background:#fff;border:1px solid var(--line);
+  border-radius:9px;padding:7px 10px;outline:none;
+}
+select:focus,input:focus,textarea:focus{border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-soft)}
+textarea{width:100%;resize:vertical;line-height:1.7}
+button.btn{
+  font:inherit;font-size:13.5px;cursor:pointer;border:1px solid var(--line);background:#fff;color:var(--ink);
+  padding:7px 13px;border-radius:9px;
+}
+button.btn:hover{background:#f7f8fa}
+button.btn.primary{background:var(--acc);border-color:var(--acc);color:#fff}
+button.btn.primary:hover{filter:brightness(1.06)}
+button.btn.ghost{border-color:transparent;background:#eef0f3}
+button.btn.on{border-color:var(--acc);color:var(--acc);background:var(--acc-soft)}
+button.btn:disabled{opacity:.45;cursor:not-allowed}
+.chip{
+  display:inline-block;font-size:12px;padding:2px 8px;border-radius:99px;background:#eef0f3;color:var(--ink2);
+  white-space:nowrap;
+}
+.chip.acc{background:var(--acc-soft);color:var(--acc)}
+.chip.ok{background:var(--ok-soft);color:var(--ok)}
+.chip.bad{background:var(--bad-soft);color:var(--bad)}
+.chip.warn{background:var(--warn-soft);color:var(--warn)}
+.stats{display:flex;gap:22px;flex-wrap:wrap}
+.stat b{display:block;font-size:22px;line-height:1.3}
+.stat span{font-size:12px;color:var(--ink3)}
+/* 题库列表 */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(248px,1fr));gap:10px}
+.qcard{
+  background:#fff;border:1px solid var(--line);border-radius:12px;padding:11px 13px;cursor:pointer;
+  display:flex;flex-direction:column;gap:7px;min-height:104px;
+}
+.qcard:hover{border-color:var(--acc);box-shadow:0 3px 14px rgba(47,109,246,.10)}
+.qcard .top{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink3)}
+.qcard .no{font-weight:700;color:var(--ink);font-size:13px}
+.qcard .stem{font-size:13.5px;color:var(--ink2);flex:1;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.qcard .bot{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.dot{width:8px;height:8px;border-radius:50%;background:#d5d9e0;display:inline-block}
+.dot.ok{background:var(--ok)} .dot.bad{background:var(--bad)} .dot.half{background:var(--warn)}
+/* 练习 */
+.pbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.qbody{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px}
+.material{background:#fbfbfd;border:1px dashed var(--line);border-radius:12px;padding:12px 14px;margin-bottom:14px;font-size:14px}
+.material .mtitle{font-size:12px;color:var(--ink3);margin-bottom:6px}
+.material p{margin:.35em 0}
+.md-table{border-collapse:collapse;margin:8px 0;font-size:13.5px}
+.md-table th,.md-table td{border:1px solid var(--line);padding:4px 10px;text-align:center}
+.md-table th{background:#f2f4f7;font-weight:600}
+.fig{margin:6px 0 14px;text-align:center}
+.fig svg{max-width:100%;height:auto}
+.stem{font-size:16px;line-height:1.85;white-space:pre-wrap;margin-bottom:14px}
+.stem strong{color:var(--ink);background:linear-gradient(transparent 62%,#ffe9a8 62%)}
+.opts{display:flex;flex-direction:column;gap:8px}
+.opt{
+  display:flex;gap:10px;align-items:flex-start;text-align:left;font:inherit;font-size:15px;cursor:pointer;
+  background:#fff;border:1px solid var(--line);border-radius:11px;padding:10px 13px;width:100%;line-height:1.6;
+}
+.opt:hover{border-color:var(--acc);background:#fafbff}
+.opt .k{
+  flex:0 0 22px;height:22px;border-radius:50%;background:#eef0f3;color:var(--ink2);
+  display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:700;margin-top:1px;
+}
+.opt.picked{border-color:var(--acc);background:var(--acc-soft)}
+.opt.picked .k{background:var(--acc);color:#fff}
+.opt.right{border-color:var(--ok);background:var(--ok-soft)}
+.opt.right .k{background:var(--ok);color:#fff}
+.opt.wrong{border-color:var(--bad);background:var(--bad-soft)}
+.opt.wrong .k{background:var(--bad);color:#fff}
+.verdict{margin:14px 0 0;font-size:14.5px;font-weight:600}
+.verdict.ok{color:var(--ok)} .verdict.bad{color:var(--bad)}
+.reveal{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.box{border-radius:12px;padding:11px 14px;margin-top:10px;font-size:14.2px;line-height:1.8}
+.box .lab{font-size:12px;display:block;margin-bottom:3px;letter-spacing:.5px}
+.box.tip{background:var(--acc-soft)}
+.box.tip .lab{color:var(--acc)}
+.box.ana{background:#f7f8fa}
+.box.ana .lab{color:var(--ink3)}
+.note-wrap{margin-top:16px;border-top:1px solid var(--line);padding-top:12px}
+.note-wrap .lab{font-size:12.5px;color:var(--ink3);margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.pager{display:flex;gap:8px;align-items:center;margin-top:16px;flex-wrap:wrap}
+.timer{font-variant-numeric:tabular-nums;font-weight:700}
+.timer.hot{color:var(--bad)}
+/* 表格 */
+table.list{width:100%;border-collapse:collapse;font-size:13.5px}
+table.list th,table.list td{border-bottom:1px solid var(--line);padding:8px 9px;text-align:left;vertical-align:top}
+table.list th{font-weight:600;color:var(--ink2);background:#fafbfc;position:sticky;top:56px}
+table.list tr:hover td{background:#fafbff}
+.nbox{background:#f7f8fa;border-left:3px solid var(--acc);padding:10px 13px;border-radius:0 10px 10px 0;margin:8px 0;font-size:14px}
+ul.tight{margin:.3em 0;padding-left:1.25em}
+ul.tight li{margin:.22em 0}
+details{border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin:8px 0;background:#fff}
+details summary{cursor:pointer;font-weight:600;font-size:14px}
+.banner{background:var(--warn-soft);border:1px solid #f2ddb4;color:#7a4c07;border-radius:10px;padding:9px 13px;font-size:13.5px;margin-bottom:12px}
+.kbd{font:12px/1.6 ui-monospace,Menlo,monospace;background:#eef0f3;border-radius:5px;padding:1px 5px;color:var(--ink2)}
+@media (max-width:640px){
+  .hd{gap:8px} nav{width:100%;margin-left:0;overflow-x:auto}
+  .qbody{padding:14px}
+  table.list th{position:static}
+}
+@media print{ header,nav,.pager,.reveal,.note-wrap{display:none} .view{display:block!important} }
+</style>
+</head>
+<body>
+<header>
+  <div class="hd">
+    <div class="brand">秋招行测题库<span class="sub" id="hdsub">银行 EPI</span></div>
+    <nav id="tabs"></nav>
+  </div>
+</header>
+<main>
+  <section class="view" id="v-list"></section>
+  <section class="view" id="v-practice"></section>
+  <section class="view" id="v-wrong"></section>
+  <section class="view" id="v-notes"></section>
+  <section class="view" id="v-plan"></section>
+  <section class="view" id="v-quick"></section>
+  <section class="view" id="v-data"></section>
+</main>
+
+<script>
+"use strict";
+const BANK = /*__BANK__*/;
+const APPENDIX = /*__APPENDIX__*/;
+const QS = BANK.questions;
+const BY_ID = {}; QS.forEach(q=>BY_ID[q.id]=q);
+const MODULES = []; QS.forEach(q=>{ if(!MODULES.includes(q.module)) MODULES.push(q.module); });
+const TOPICS = []; QS.forEach(q=>{ if(!TOPICS.includes(q.topic)) TOPICS.push(q.topic); });
+const N_ORIG = QS.filter(q=>q.src!=="gen").length;
+const N_GEN = QS.length - N_ORIG;
+const isGen = q => q.src==="gen";
+const KEY = "epi_bank_v1";
+
+/* ---------------- 存储 ---------------- */
+let S = load();
+function blank(){ return {v:1, rec:{}, plan:{}, ui:{mode:"practice"}}; }
+function load(){
+  try{ const o=JSON.parse(localStorage.getItem(KEY)); if(o&&o.rec) return Object.assign(blank(),o); }catch(e){}
+  return blank();
+}
+let saveTimer=null;
+function save(now){
+  const doIt=()=>{ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){ console.warn("保存失败",e); } };
+  if(now) return doIt();
+  clearTimeout(saveTimer); saveTimer=setTimeout(doIt,300);
+}
+function R(id){
+  if(!S.rec[id]) S.rec[id]={picked:null,correct:null,tries:0,wrong:0,timeMs:0,fav:false,doubt:false,note:"",ts:0};
+  return S.rec[id];
+}
+const answered = id => S.rec[id] && S.rec[id].picked;
+const isWrong  = id => S.rec[id] && S.rec[id].wrong>0;
+const stateOf  = id => { const r=S.rec[id]; if(!r||!r.picked) return "none"; return r.correct?"ok":"bad"; };
+
+/* ---------------- 通用 ---------------- */
+const $  = (s,r)=>(r||document).querySelector(s);
+const $$ = (s,r)=>Array.from((r||document).querySelectorAll(s));
+const esc = s => String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+/* 渲染用：先转义再转 markdown 加粗，防止题干/解析里的 < > 被当成标签 */
+const mdEsc = s => esc(s).replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>").replace(/`([^`]+)`/g,"<code>$1</code>");
+const stemText = q => q.stem.replace(/\*\*/g,"").replace(/`/g,"").replace(/\s+/g," ").trim();
+function fmtClock(ms){
+  ms=Math.max(0,ms|0);
+  const t=Math.round(ms/1000), m=Math.floor(t/60), s=t%60;
+  if(m>=60) return Math.floor(m/60)+":"+String(m%60).padStart(2,"0")+":"+String(s).padStart(2,"0");
+  return m+":"+String(s).padStart(2,"0");
+}
+function download(name, text, mime){
+  const blob=new Blob([text],{type:mime||"text/plain;charset=utf-8"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},500);
+}
+function toast(msg){
+  const d=document.createElement("div");
+  d.textContent=msg;
+  d.style.cssText="position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#1f2328;color:#fff;padding:9px 16px;border-radius:10px;font-size:13.5px;z-index:999;opacity:0;transition:opacity .2s";
+  document.body.appendChild(d); requestAnimationFrame(()=>d.style.opacity="1");
+  setTimeout(()=>{d.style.opacity="0";setTimeout(()=>d.remove(),250);},1600);
+}
+
+/* ---------------- 导航 ---------------- */
+const TABS=[["list","题库"],["practice","练习"],["wrong","错题本"],["notes","我的思路"],["plan","刷题计划"],["quick","速查卡"],["data","数据"]];
+let view="list";
+function renderTabs(){
+  $("#tabs").innerHTML = TABS.map(([k,t])=>{
+    let n="";
+    if(k==="wrong"){ const c=Object.keys(S.rec).filter(isWrong).length; if(c) n=' <span class="chip bad">'+c+"</span>"; }
+    if(k==="notes"){ const c=Object.keys(S.rec).filter(id=>S.rec[id].note&&S.rec[id].note.trim()).length; if(c) n=' <span class="chip">'+c+"</span>"; }
+    return '<button data-tab="'+k+'" class="'+(view===k?"on":"")+'">'+t+n+"</button>";
+  }).join("");
+  $$("#tabs button").forEach(b=>b.onclick=()=>go(b.dataset.tab));
+}
+let suppressHash=false;
+function showView(v){
+  view=v;
+  $$(".view").forEach(s=>s.classList.remove("on"));
+  const el=$("#v-"+v); if(el) el.classList.add("on");
+  renderTabs();
+  if(v==="list") renderList();
+  else if(v==="practice") renderPractice();
+  else if(v==="wrong") renderWrong();
+  else if(v==="notes") renderNotes();
+  else if(v==="plan") renderPlan();
+  else if(v==="quick") renderQuick();
+  else if(v==="data") renderData();
+  window.scrollTo({top:0,behavior:"instant"});
+}
+/* 切页：同步地址栏（可收藏、可前进后退） */
+function go(v){
+  if(view==="practice") bankTime();
+  const target="#/"+v;
+  if(location.hash!==target){ suppressHash=true; location.hash=target; suppressHash=false; }
+  showView(v);
+}
+/* 地址栏 -> 界面：#/plan、#/practice/12 这类链接直接打开对应页面 */
+function applyRoute(){
+  const raw=String(location.hash||"").replace(/^#\/?/,"");
+  const parts=raw.split("/");
+  const known=TABS.map(t=>t[0]);
+  const v=known.indexOf(parts[0])>=0?parts[0]:"list";
+  const arg=parts[1];
+  if(view==="practice" && v!=="practice") bankTime();
+  if(v==="practice" && arg){
+    const qid=Number(arg);
+    if(BY_ID[qid] && (!cur() || cur().id!==qid)){
+      queue=QS.map(q=>q.id);
+      idx=queue.indexOf(qid);
+      if(idx<0){ queue=[qid]; idx=0; }
+      showTip=showAna=false;
+    }
+  }
+  showView(v);
+}
+
+/* ---------------- 练习状态 ---------------- */
+let queue=[], idx=0, showTip=false, showAna=false, examMode=false;
+let setLimitMs=0, setRemainMs=0, tick=null, qStart=0, activeQid=null, finished=false;
+
+/* 把当前题的用时落账，切换题目/离开练习页前调用 */
+function bankTime(){
+  if(!activeQid) return;
+  const r=R(activeQid), dt=Date.now()-qStart;
+  if(dt>0 && dt<3600000) r.timeMs=(r.timeMs||0)+dt;
+  qStart=Date.now(); activeQid=null;
+}
+
+function startSet(ids, opt){
+  opt=opt||{};
+  bankTime();
+  queue=ids.slice(); idx=0;
+  showTip=showAna=false; finished=false;
+  examMode=!!opt.exam;
+  setLimitMs=(opt.minutes||0)*60000; setRemainMs=setLimitMs;
+  $("#v-practice").dataset.label=opt.label||"";
+  go("practice");
+  startTick();
+}
+function startTick(){
+  if(tick) clearInterval(tick);
+  if(!setLimitMs) { const t=$("#setTimer"); if(t) t.textContent=""; return; }
+  tick=setInterval(()=>{
+    setRemainMs-=1000;
+    const el=$("#setTimer");
+    if(el){
+      el.textContent="组卷剩余 "+fmtClock(setRemainMs);
+      el.classList.toggle("hot", setRemainMs<=60000);
+    }
+    if(setRemainMs<=0){ clearInterval(tick); tick=null; toast("本组时间到，先看错在哪，别恋战"); }
+  },1000);
+}
+function cur(){ return BY_ID[queue[idx]]; }
+
+function renderPractice(){
+  const box=$("#v-practice");
+  if(!queue.length){
+    box.innerHTML='<div class="card"><h2>练习</h2><p class="muted">还没选题目。去「题库」筛一组，或到「刷题计划」点某天的「开始」。</p>'
+      +'<div class="row" style="margin-top:10px">'
+      +'<button class="btn primary" onclick="startSet(QS.filter(q=>!isGen(q)).map(q=>q.id),{label:\'原题 134\'})">原题 134 道</button>'
+      +'<button class="btn" onclick="startSet(QS.filter(isGen).map(q=>q.id),{label:\'生成题全刷\'})">生成题全刷（'+N_GEN+'）</button>'
+      +'<button class="btn" onclick="startRandom(20)">随机 20 题</button>'
+      +'<button class="btn" onclick="startRandom(50)">随机 50 题</button>'
+      +'<button class="btn" onclick="startSet(QS.filter(q=>!S.rec[q.id]||!S.rec[q.id].picked).map(q=>q.id),{label:\'未做题\'})">只做没做过的</button>'
+      +'</div>'
+      +'<p class="muted" style="margin-top:10px">生成题由出题器按考点批量产出（数字推理、数学运算、资料分析、翻译推理），每题答案都由程序按规则反算校验；原题 134 道是手写真题/仿真题。</p></div>';
+    return;
+  }
+  const q=cur(); const r=R(q.id);
+  const picked=r.picked;
+  const showVerdict = picked && !examMode;
+  const optCls = o=>{
+    let c="opt";
+    if(picked===o.k) c+=" picked";
+    if(showVerdict){
+      if(o.k===q.answer) c+=" right";
+      else if(picked===o.k) c+=" wrong";
+    }
+    return c;
+  };
+  box.innerHTML =
+   '<div class="pbar">'
+   +'<span class="chip acc">'+(q.module===q.topic?esc(q.module):esc(q.module)+' · '+esc(q.topic))+'</span>'
+   +'<span class="no" style="font-weight:700">第 '+q.id+' 题</span>'
+   +'<span class="muted">本组 '+(idx+1)+'/'+queue.length+(setLimitMs?' · <span class="timer" id="setTimer"></span>':'')+'</span>'
+   +'<span class="spacer"></span>'
+   +'<button class="btn '+(examMode?"on":"")+'" id="modeBtn">'+(examMode?"考试模式":"练习模式")+'</button>'
+   +'<button class="btn '+(r.fav?"on":"")+'" id="favBtn">'+(r.fav?"★ 已收藏":"☆ 收藏")+'</button>'
+   +'<button class="btn '+(r.doubt?"on":"")+'" id="doubtBtn">'+(r.doubt?"? 存疑":"? 标记存疑")+'</button>'
+   +'<span class="timer muted" id="qTimer">本题 0:00</span>'
+   +'</div>'
+   +'<div class="qbody">'
+   +(q.materialHtml?'<div class="material"><div class="mtitle">'+esc(q.materialTitle)+'　<span class="chip" id="matToggle" style="cursor:pointer">收起材料</span></div><div id="matBody">'+q.materialHtml+'</div></div>':'')
+   +(q.svg?'<div class="fig">'+q.svg+'</div>':'')
+   +'<div class="stem">'+mdEsc(q.stem)+'</div>'
+   +'<div class="opts">'+q.options.map(o=>'<button class="'+optCls(o)+'" data-k="'+o.k+'"><span class="k">'+o.k+'</span><span>'+esc(o.t)+'</span></button>').join("")+'</div>'
+   +(showVerdict?'<div class="verdict '+(picked===q.answer?"ok":"bad")+'">'+(picked===q.answer?"✓ 答对了":"✗ 答错了，正确答案是 "+q.answer)+'　<span class="muted">（本题累计作答 '+r.tries+' 次，错 '+r.wrong+' 次）</span></div>':'')
+   +(examMode&&picked?'<div class="verdict muted" style="color:#8b94a3">已选 '+picked+'，考试模式下交卷后统一公布答案。</div>':'')
+   +'<div class="reveal">'
+   +'<button class="btn" id="tipBtn">'+(showTip?"收起标准思路":"看标准思路（技巧）")+'</button>'
+   +'<button class="btn" id="anaBtn">'+(showAna?"收起逐步解析":"看逐步解析")+'</button>'
+   +(examMode?'<button class="btn primary" id="submitBtn">交卷看本组结果</button>':'')
+   +'</div>'
+   +(showTip?'<div class="box tip"><span class="lab">标准思路 · 技巧</span>'+mdEsc(q.tip)+'</div>':'')
+   +(showAna?'<div class="box ana"><span class="lab">逐步解析</span>'+(q.analysis?mdEsc(q.analysis):'<span class="muted">原文未给逐步解析（常识模块只给了技巧与答案）。可在此处补上你自己的推理链。</span>')+'</div>':'')
+   +(q.sectionTip?'<div class="box ana"><span class="lab">题型通用破题顺序</span>'+mdEsc(q.sectionTip)+'</div>':'')
+   +'<div class="note-wrap"><div class="lab">我的思路笔记'
+     +'<span class="chip" id="noteState">'+(r.note&&r.note.trim()?"已记录 "+r.note.length+" 字":"空")+'</span>'
+     +'<span class="muted">卡在哪一步 / 用了什么技巧 / 下次怎么更快，随手写，自动保存</span></div>'
+   +'<textarea id="note" rows="4" placeholder="例：先看「转折之后是重点」，把尾句圈出来再选；错在只读了前半句……">'+esc(r.note||"")+'</textarea></div>'
+   +'<div class="pager">'
+   +'<button class="btn" id="prevBtn"'+(idx===0?" disabled":"")+'>← 上一题</button>'
+   +'<button class="btn" id="nextBtn">下一题 →</button>'
+   +'<button class="btn ghost" id="skipBtn">跳过</button>'
+   +'<span class="spacer"></span>'
+   +'<span class="muted">快捷键：<span class="kbd">1-4</span>/<span class="kbd">A-D</span> 选答　<span class="kbd">空格</span> 看解析　<span class="kbd">←</span><span class="kbd">→</span> 切题　<span class="kbd">F</span> 收藏</span>'
+   +'</div>'
+   +'</div>';
+
+  // 事件
+  $$(".opt",box).forEach(b=>b.onclick=()=>pick(b.dataset.k));
+  $("#tipBtn").onclick=()=>{ showTip=!showTip; renderPractice(); };
+  $("#anaBtn").onclick=()=>{ showAna=!showAna; renderPractice(); };
+  $("#modeBtn").onclick=()=>{ examMode=!examMode; renderPractice(); };
+  $("#favBtn").onclick=()=>{ r.fav=!r.fav; save(); renderPractice(); };
+  $("#doubtBtn").onclick=()=>{ r.doubt=!r.doubt; save(); renderPractice(); };
+  const mb=$("#submitBtn"); if(mb) mb.onclick=finishSet;
+  $("#prevBtn").onclick=()=>{ if(idx>0){ bankTime(); idx--; showTip=showAna=false; renderPractice(); } };
+  $("#nextBtn").onclick=()=>next(1);
+  $("#skipBtn").onclick=()=>next(1);
+  const mt=$("#matToggle");
+  if(mt) mt.onclick=()=>{ const b=$("#matBody"); const hid=b.style.display==="none"; b.style.display=hid?"":"none"; mt.textContent=hid?"收起材料":"展开材料"; };
+  const nt=$("#note");
+  let nd=null;
+  nt.oninput=()=>{
+    r.note=nt.value;
+    clearTimeout(nd); nd=setTimeout(()=>{ save(); $("#noteState").textContent=r.note.trim()?"已记录 "+r.note.length+" 字":"空"; },400);
+  };
+  const st=$("#setTimer"); if(st&&setLimitMs) st.textContent="组卷剩余 "+fmtClock(setRemainMs);
+  activeQid=q.id; qStart=Date.now();
+  try{ if(location.hash!=="#/practice/"+q.id) history.replaceState(null,"","#/practice/"+q.id); }catch(e){}
+  if(timerEl) clearInterval(timerEl);
+  timerEl=setInterval(()=>{ const e=$("#qTimer"); if(e) e.textContent="本题 "+fmtClock(Date.now()-qStart); },500);
+}
+let timerEl=null;
+function pick(k){
+  const q=cur(); const r=R(q.id);
+  if(r.picked && !examMode) return;          // 练习模式已答，锁住避免误触
+  if(r.picked===null) r.tries=(r.tries||0)+1;
+  const prevWrong = r.correct===false;
+  r.picked=k; r.correct=(k===q.answer);
+  if(!r.correct && !prevWrong) r.wrong=(r.wrong||0)+1;   // 错误次数只累加，用于错题本
+  r.ts=Date.now();
+  save(); renderTabs();
+  if(!examMode) showTip=true;                // 练习模式答完自动给标准思路
+  renderPractice();
+}
+function next(d){
+  if(idx<queue.length-1){ bankTime(); idx+=d; showTip=showAna=false; renderPractice(); }
+  else { if(examMode) finishSet(); else toast("本组已到最后一题"); }
+}
+function finishSet(){
+  bankTime();
+  finished=true; examMode=false;
+  const rows=queue.map(id=>{ const q=BY_ID[id], r=S.rec[id]||{}; const ok=r.picked===q.answer; return {q,r,ok}; });
+  const done=rows.filter(x=>x.r.picked);
+  const right=done.filter(x=>x.ok).length;
+  $("#v-practice").innerHTML='<div class="card"><h2>本组结果</h2>'
+    +'<div class="stats"><div class="stat"><b>'+right+'/'+done.length+'</b><span>答对/已答</span></div>'
+    +'<div class="stat"><b>'+(done.length?Math.round(right/done.length*100):0)+'%</b><span>正确率</span></div>'
+    +'<div class="stat"><b>'+(queue.length-done.length)+'</b><span>未作答</span></div></div>'
+    +'<div class="row" style="margin-top:14px"><button class="btn primary" onclick="startSet(queue.slice(),{label:\'重做本组\'})">重做本组</button>'
+    +'<button class="btn" onclick="startWrong()">重练错题</button>'
+    +'<button class="btn" onclick="go(\'wrong\')">去错题本</button>'
+    +'<button class="btn" onclick="go(\'data\')">看统计</button></div></div>'
+    +'<table class="list"><thead><tr><th>题号</th><th>题型</th><th>我的答案</th><th>正确答案</th><th>结果</th><th>我的笔记</th></tr></thead><tbody>'
+    +rows.map(x=>'<tr><td><a href="javascript:void(0)" onclick="jump('+x.q.id+')">'+x.q.id+'</a></td><td>'+esc(x.q.topic)+'</td><td>'+(x.r.picked||"—")+'</td><td>'+x.q.answer+'</td><td>'
+      +(x.r.picked?(x.ok?'<span class="chip ok">对</span>':'<span class="chip bad">错</span>'):'<span class="chip">未答</span>')+'</td>'
+      +'<td class="muted">'+esc((x.r.note||"").slice(0,40))+'</td></tr>').join("")
+    +'</tbody></table>';
+  if(timerEl) clearInterval(timerEl);
+  if(tick) clearInterval(tick);
+}
+function jump(id){
+  bankTime();
+  const i=queue.indexOf(id);
+  if(i<0){ queue=QS.map(q=>q.id); idx=queue.indexOf(id); if(idx<0){ queue=[id]; idx=0; } } else idx=i;
+  showTip=showAna=false; go("practice");
+}
+function startRandom(n){ const a=QS.map(q=>q.id); for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]];} startSet(a.slice(0,n),{label:"随机 "+n+" 题"}); }
+function startWrong(){ const ids=Object.keys(S.rec).filter(isWrong).map(Number).sort((a,b)=>a-b); if(!ids.length){ toast("错题本是空的，先做几组题"); return; } startSet(ids,{label:"错题重练"}); }
+
+/* ---------------- 题库列表 ---------------- */
+let fModule="", fTopic="", fState="", fText="", fSrc="";
+function renderList(){
+  const modes=[["","全部"],["none","未做"],["bad","做错的"],["fav","收藏"],["doubt","存疑"],["note","有笔记"],["ana","无解析"]];
+  const srcs=[["","全部来源"],["orig","仅原题（"+N_ORIG+"）"],["gen","仅生成题（"+N_GEN+"）"]];
+  $("#v-list").innerHTML='<div class="card">'
+   +'<div class="row">'
+   +'<select id="fm"><option value="">全部模块</option>'+MODULES.map(m=>'<option '+(fModule===m?"selected":"")+'>'+esc(m)+'</option>').join("")+'</select>'
+   +'<select id="ft"><option value="">全部题型</option>'+TOPICS.map(t=>'<option '+(fTopic===t?"selected":"")+'>'+esc(t)+'</option>').join("")+'</select>'
+   +'<select id="fs">'+srcs.map(([v,t])=>'<option value="'+v+'" '+(fSrc===v?"selected":"")+'>'+esc(t)+'</option>').join("")+'</select>'
+   +'<input type="search" id="fq" placeholder="搜索题干关键词，如 比重 / 数列 / 工程" style="min-width:200px" value="'+esc(fText)+'">'
+   +'<span class="spacer"></span>'
+   +'<button class="btn primary" id="startFiltered">开始这一组</button>'
+   +'</div>'
+   +'<div class="row" style="margin-top:10px">'+modes.map(([k,t])=>'<button class="btn '+(fState===k?"on":"")+'" data-st="'+k+'">'+t+'</button>').join("")+'</div>'
+   +'</div>'
+   +'<div class="row" style="margin:0 0 10px"><span class="muted" id="cnt"></span>'
+   +'<span class="muted">· 原题 134 道为手写真题/仿真题；生成题由出题器按考点批量产出，答案经程序反算校验，解析为模板生成</span></div>'
+   +'<div class="grid" id="grid"></div>';
+  const rebuild=()=>{ fModule=$("#fm").value; fTopic=$("#ft").value; fSrc=$("#fs").value; fText=$("#fq").value.trim(); drawGrid(); };
+  $("#fm").onchange=rebuild; $("#ft").onchange=rebuild; $("#fs").onchange=rebuild;
+  let qt=null; $("#fq").oninput=()=>{ clearTimeout(qt); qt=setTimeout(rebuild,180); };
+  $$("[data-st]").forEach(b=>b.onclick=()=>{ fState=b.dataset.st; renderList(); });
+  $("#startFiltered").onclick=()=>{ const ids=filtered().map(q=>q.id); if(!ids.length) return toast("这组筛选结果为空"); startSet(ids,{label:"筛选组"}); };
+  drawGrid();
+}
+function filtered(){
+  return QS.filter(q=>{
+    if(fModule && q.module!==fModule) return false;
+    if(fTopic && q.topic!==fTopic) return false;
+    if(fSrc==="orig" && isGen(q)) return false;
+    if(fSrc==="gen" && !isGen(q)) return false;
+    if(fText && !(q.stem+" "+q.options.map(o=>o.t).join(" ")+" "+q.tip).includes(fText)) return false;
+    const r=S.rec[q.id]||{};
+    if(fState==="none" && r.picked) return false;
+    if(fState==="bad" && !(r.wrong>0)) return false;
+    if(fState==="fav" && !r.fav) return false;
+    if(fState==="doubt" && !r.doubt) return false;
+    if(fState==="note" && !(r.note&&r.note.trim())) return false;
+    if(fState==="ana" && q.analysis) return false;
+    return true;
+  });
+}
+function drawGrid(){
+  const list=filtered();
+  $("#cnt").textContent="共 "+list.length+" 题"+(list.length===QS.length?"":"（已从全库 "+QS.length+" 题中筛出）");
+  $("#grid").innerHTML=list.map(q=>{
+    const r=S.rec[q.id]||{}; const st=stateOf(q.id);
+    const dot=st==="ok"?'<span class="dot ok"></span>':st==="bad"?'<span class="dot bad"></span>':'<span class="dot"></span>';
+    return '<div class="qcard" data-id="'+q.id+'">'
+      +'<div class="top">'+dot+'<span class="no">'+q.id+'</span><span class="chip">'+esc(q.topic)+'</span>'
+      +(isGen(q)?'<span class="chip acc">生成</span>':'')
+      +(q.svg?'<span class="chip">图</span>':'')+(q.analysis?'':'<span class="chip warn">无解析</span>')
+      +(r.fav?'<span class="chip ok">★</span>':'')+(r.doubt?'<span class="chip warn">?</span>':'')+'</div>'
+      +'<div class="stem">'+esc(stemText(q))+'</div>'
+      +'<div class="bot">'+(r.picked?'<span class="chip '+(st==="ok"?"ok":"bad")+'">已答 '+r.picked+'</span>':'<span class="chip">未做</span>')
+      +(r.wrong>0?'<span class="chip bad">错 '+r.wrong+' 次</span>':'')
+      +((r.note&&r.note.trim())?'<span class="chip acc">有笔记</span>':'')+'</div>'
+      +'</div>';
+  }).join("");
+  $$(".qcard").forEach(c=>c.onclick=()=>{ queue=filtered().map(q=>q.id); idx=Math.max(0,queue.indexOf(Number(c.dataset.id))); if(idx<0){queue=[Number(c.dataset.id)];idx=0;} showTip=showAna=false; examMode=false; setLimitMs=0; if(tick)clearInterval(tick); go("practice"); });
+}
+
+/* ---------------- 错题本 ---------------- */
+function renderWrong(){
+  const ids=Object.keys(S.rec).filter(isWrong).map(Number).sort((a,b)=>(S.rec[b].wrong||0)-(S.rec[a].wrong||0)||a-b);
+  const box=$("#v-wrong");
+  if(!ids.length){ box.innerHTML='<div class="card"><h2>错题本</h2><p class="muted">还没有错题。做错的题会自动进这里，并保留错误次数。</p></div>'; return; }
+  box.innerHTML='<div class="card"><div class="row"><h2 style="margin:0">错题本 · '+ids.length+' 题</h2><span class="spacer"></span>'
+   +'<button class="btn primary" id="redo">按错误次数重练</button>'
+   +'<button class="btn" id="exMD">导出 Markdown</button>'
+   +'<button class="btn" id="exCSV">导出 CSV</button></div></div>'
+   +'<table class="list"><thead><tr><th>题号</th><th>题型</th><th>正确答案</th><th>我的答案</th><th>错次</th><th>标准思路</th><th>我的笔记</th><th></th></tr></thead><tbody>'
+   +ids.map(id=>{ const q=BY_ID[id], r=S.rec[id];
+      return '<tr><td><b>'+id+'</b></td><td>'+esc(q.topic)+'</td><td>'+q.answer+'</td><td>'+(r.picked||"—")+'</td>'
+        +'<td><span class="chip bad">'+r.wrong+'</span></td><td class="muted">'+esc((q.tip||"").slice(0,44))+'</td>'
+        +'<td class="muted">'+esc((r.note||"").slice(0,30))+'</td>'
+        +'<td><button class="btn" data-open="'+id+'">看题</button></td></tr>'; }).join("")
+   +'</tbody></table>';
+  $("#redo").onclick=()=>startSet(ids,{label:"错题重练"});
+  $$("[data-open]",box).forEach(b=>b.onclick=()=>jump(Number(b.dataset.open)));
+  $("#exMD").onclick=()=>download("错题本.md", wrongMD(ids), "text/markdown;charset=utf-8");
+  $("#exCSV").onclick=()=>download("错题本.csv", "\uFEFF"+wrongCSV(ids), "text/csv;charset=utf-8");
+}
+function wrongMD(ids){
+  const L=["# 错题本（秋招行测题库）","","> 导出时间："+new Date().toLocaleString("zh-CN"),"> 共 "+ids.length+" 题",""];
+  ids.forEach(id=>{ const q=BY_ID[id], r=S.rec[id]||{};
+    L.push("## 第 "+id+" 题 · "+q.topic+"（错 "+r.wrong+" 次，我的答案 "+(r.picked||"—")+"，正确 "+q.answer+"）","");
+    L.push("**题干**："+q.stem.replace(/\n/g," "),"");
+    q.options.forEach(o=>L.push("- "+o.k+". "+o.t));
+    L.push("","**标准思路**："+q.tip,"");
+    if(q.analysis) L.push("**逐步解析**："+q.analysis,"");
+    if(r.note&&r.note.trim()) L.push("**我的思路笔记**：",r.note,"");
+    L.push("---","");
+  });
+  return L.join("\n");
+}
+function wrongCSV(ids){
+  const rows=[["题号","模块","题型","正确答案","我的答案","错误次数","我的笔记"]];
+  ids.forEach(id=>{ const q=BY_ID[id], r=S.rec[id]||{};
+    rows.push([id,q.module,q.topic,q.answer,r.picked||"",r.wrong,(r.note||"").replace(/\n/g," ")]); });
+  return rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(",")).join("\r\n");
+}
+
+/* ---------------- 我的思路 ---------------- */
+function renderNotes(){
+  const ids=QS.filter(q=>S.rec[q.id]&&S.rec[q.id].note&&S.rec[q.id].note.trim()).map(q=>q.id);
+  const box=$("#v-notes");
+  box.innerHTML='<div class="card"><div class="row"><h2 style="margin:0">我的思路 · '+ids.length+' 条</h2><span class="spacer"></span>'
+   +'<input type="search" id="nq" placeholder="搜索笔记或题干" style="min-width:220px">'
+   +'<button class="btn" id="exN">导出 Markdown</button></div>'
+   +'<p class="muted" style="margin:10px 0 0">这里是你自己写的解题思路，和题库原带的「技巧/解析」并列保存，随时回看。</p></div>'
+   +(ids.length?'':'<div class="card muted">还没有笔记。做题时在题目下方的「我的思路笔记」里随手写，这里会汇总。</div>')
+   +ids.map(id=>{ const q=BY_ID[id], r=S.rec[id];
+      return '<div class="card" data-txt="'+esc((q.stem+r.note).toLowerCase())+'">'
+        +'<div class="row"><span class="chip acc">第 '+id+' 题</span><span class="chip">'+esc(q.topic)+'</span>'
+        +'<span class="muted">'+esc(stemText(q).slice(0,60))+'</span><span class="spacer"></span>'
+        +'<button class="btn" data-jump="'+id+'">做题页</button></div>'
+        +'<textarea data-note="'+id+'" rows="3" style="margin-top:8px">'+esc(r.note)+'</textarea></div>'; }).join("");
+  $("#exN").onclick=()=>{
+    const L=["# 我的行测解题思路","","> 导出时间："+new Date().toLocaleString("zh-CN"),""];
+    ids.forEach(id=>{ const q=BY_ID[id], r=S.rec[id]; L.push("## 第 "+id+" 题 · "+q.topic,""); L.push(stemText(q),"",r.note,"","---",""); });
+    download("我的思路.md", L.join("\n"), "text/markdown;charset=utf-8");
+  };
+  const nq=$("#nq");
+  nq.oninput=()=>{ const v=nq.value.trim().toLowerCase(); $$("#v-notes .card[data-txt]").forEach(c=>{ c.style.display=!v||c.dataset.txt.includes(v)?"":"none"; }); };
+  $$("#v-notes [data-jump]").forEach(b=>b.onclick=()=>jump(Number(b.dataset.jump)));
+  $$("#v-notes textarea[data-note]").forEach(t=>{
+    let d=null;
+    t.oninput=()=>{ const id=Number(t.dataset.note); R(id).note=t.value; clearTimeout(d); d=setTimeout(()=>{ save(); renderTabs(); },400); };
+  });
+}
+
+/* ---------------- 刷题计划 ---------------- */
+const PLAN=[
+ {d:1,w:1,t:"逻辑填空 1-12",sel:{k:"r",a:1,b:12},min:15,goal:"≥75%",act:"每个错项都写一句「为什么排除」，逻辑填空靠照应词，不靠语感"},
+ {d:2,w:1,t:"片段阅读 13-22",sel:{k:"r",a:13,b:22},min:15,goal:"≥80%",act:"做完标出主旨句在第几句；转折/递进/尾句是重点"},
+ {d:3,w:1,t:"病句 23-32 + 语句排序 33-40",sel:{k:"r",a:23,b:40},min:22,goal:"≥75%",act:"背「通过…使…/是否…是…/大约…左右」三大模板；排序背四步"},
+ {d:4,w:1,t:"数字推理 41-54",sel:{k:"r",a:41,b:54},min:18,goal:"≥70%",act:"每题在笔记里写「我用的方法名」：作差/作和/倍数/平方"},
+ {d:5,w:1,t:"数学运算 55-67",sel:{k:"r",a:55,b:67},min:22,goal:"≥65%",act:"主抓工程、行程、利润三类；单题超 90 秒就跳过"},
+ {d:6,w:1,t:"定义判断 68-77 + 类比 78-87",sel:{k:"r",a:68,b:87},min:20,goal:"≥80%",act:"定义用「一个要件排除一个选项」；类比先给关系命名再比对"},
+ {d:7,w:1,t:"逻辑判断 88-99",sel:{k:"r",a:88,b:99},min:18,goal:"≥75%",act:"先把「只有…才…」翻译成箭头再推；真假话优先代入"},
+ {d:8,w:2,t:"图形推理 100-110",sel:{k:"r",a:100,b:110},min:12,goal:"≥70%",act:"用「相同看位置 / 相似看样式 / 不同看属性数量」三步定位"},
+ {d:9,w:2,t:"资料分析 111-122",sel:{k:"r",a:111,b:122},min:20,goal:"≥75%",act:"先看题干划「时间+指标+算法」，再回材料定位；选项差距大就估算"},
+ {d:10,w:2,t:"常识判断 123-134",sel:{k:"r",a:123,b:134},min:12,goal:"≥60%",act:"只记高频硬点（央行职能、GDP 口径、宪法机关），不纠结"},
+ {d:11,w:2,t:"一刷错题重做",sel:{k:"wrong"},min:20,goal:"全对",act:"只做错题；做对后仍要写一句「当时为什么错」"},
+ {d:12,w:2,t:"混合限时 40 题（原题）",sel:{k:"rand",n:40,orig:true},min:25,goal:"≥75%",act:"练「跳题」：60 秒没思路就标记跳过，绝不死磕"},
+ {d:13,w:2,t:"二刷错题 + 存疑题",sel:{k:"wrong"},min:20,goal:"全对",act:"看统计页，找出正确率最低的题型重点补"},
+ {d:14,w:2,t:"复盘日（不定时）",sel:{k:"review"},min:0,goal:"—",act:"打开「数据」页看模块正确率，把错因最多的两条写进笔记置顶"},
+ {d:15,w:3,t:"言语整组 40 题 · 35 分钟",sel:{k:"m",m:"言语理解与表达",orig:true},min:35,goal:"≥75%",act:"模拟模块独立计时，到点即停，体会银行的节奏"},
+ {d:16,w:3,t:"数量整组 27 题 · 25 分钟",sel:{k:"m",m:"数量关系",orig:true},min:25,goal:"≥65%",act:"数量不要全弃：先扫一遍，挑会做的做，剩下的统一蒙"},
+ {d:17,w:3,t:"判断整组 43 题 · 35 分钟",sel:{k:"m",m:"判断推理",orig:true},min:35,goal:"≥75%",act:"图形与定义是性价比最高的部分，优先保正确率"},
+ {d:18,w:3,t:"资料整组 12 题 · 15 分钟",sel:{k:"m",m:"资料分析",orig:true},min:15,goal:"≥75%",act:"资料是银行 EPI 提分核心，宁可少做数量也要做完全部资料"},
+ {d:19,w:3,t:"常识整组 12 题 · 10 分钟",sel:{k:"m",m:"常识判断",orig:true},min:10,goal:"≥60%",act:"不选绝对化表述；不会的 30 秒内做完标记"},
+ {d:20,w:3,t:"错题清零日",sel:{k:"wrong"},min:25,goal:"错题本清空",act:"错题全部重做一遍，仍错的标记存疑并单独记原因"},
+ {d:21,w:3,t:"全套模拟 134 题",sel:{k:"all",orig:true},min:130,goal:"≥70%",act:"按模块独立计时做完整套，考完立刻复盘，别等第二天"}
+];
+function selIds(sel){
+  if(!sel) return [];
+  const pool = sel.orig ? QS.filter(q=>!isGen(q)) : QS;   // 21 天计划针对手写原题，生成题用于自由刷题
+  if(sel.k==="r") return pool.filter(q=>q.id>=sel.a&&q.id<=sel.b).map(q=>q.id);
+  if(sel.k==="m") return pool.filter(q=>q.module===sel.m).map(q=>q.id);
+  if(sel.k==="t") return pool.filter(q=>q.topic===sel.t).map(q=>q.id);
+  if(sel.k==="wrong") return Object.keys(S.rec).filter(isWrong).map(Number).sort((a,b)=>a-b);
+  if(sel.k==="rand"){ const a=pool.map(q=>q.id); for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]];} return a.slice(0,sel.n); }
+  return pool.map(q=>q.id);
+}
+function renderPlan(){
+  let done=0; PLAN.forEach(p=>{ if(S.plan[p.d]) done++; });
+  $("#v-plan").innerHTML='<div class="card"><div class="row"><h2 style="margin:0">21 天刷题计划</h2>'
+   +'<span class="chip acc">已完成 '+done+'/'+PLAN.length+' 天</span><span class="spacer"></span>'
+   +'<button class="btn" id="prst">重置勾选</button></div>'
+   +'<p class="muted" style="margin:10px 0 0">节奏按六大行 EPI 的模块独立计时设计：第 1 周按题型吃透，第 2 周补全 + 清错题，第 3 周按模块整组模拟。每天点「开始」会自动按当天限时组卷。</p>'
+   +'<div class="banner" style="margin-top:12px">银行 EPI 单题约 40—50 秒（依据六大行公开题型题量整理：中行职业能力 70 题 60 分钟、工行通用能力 58 题 71 分钟、邮储通用就业能力 40 题 50 分钟，详见「速查卡」页）。套题慢不是问题，慢在哪一步才是问题。</div>'
+   +'<h3 style="margin-top:16px">自由刷题（生成题池，'+N_GEN+' 题）</h3>'
+   +'<p class="muted" style="margin:0 0 8px">21 天计划针对手写原题；想加练就从这个池子里抽，答案同样经过程序反算校验，题量足够反复刷新。</p>'
+   +'<div class="row">'
+   +'<button class="btn" data-free="20">随机 20 题</button>'
+   +'<button class="btn" data-free="50">随机 50 题</button>'
+   +'<button class="btn" data-free="100">随机 100 题</button>'
+   +'<button class="btn" data-free="t:数字推理">数字推理专练（'+QS.filter(q=>q.topic==="数字推理"&&isGen(q)).length+'）</button>'
+   +'<button class="btn" data-free="t:数学运算">数学运算专练（'+QS.filter(q=>q.topic==="数学运算"&&isGen(q)).length+'）</button>'
+   +'<button class="btn" data-free="t:资料分析">资料分析专练（'+QS.filter(q=>q.topic==="资料分析"&&isGen(q)).length+'）</button>'
+   +'<button class="btn" data-free="t:逻辑判断">翻译推理专练（'+QS.filter(q=>q.topic==="逻辑判断"&&isGen(q)).length+'）</button>'
+   +'</div></div>'
+   +'<table class="list"><thead><tr><th>完成</th><th>天</th><th>任务</th><th>题量</th><th>限时</th><th>目标</th><th>当天要求</th><th></th></tr></thead><tbody>'
+   +PLAN.map(p=>{ const n=selIds(p.sel).length; const isRev=p.sel.k==="review";
+      return '<tr><td><input type="checkbox" data-day="'+p.d+'" '+(S.plan[p.d]?"checked":"")+'></td>'
+      +'<td><b>D'+p.d+'</b><span class="muted"> · 第'+p.w+'周</span></td><td>'+esc(p.t)+'</td><td>'+(isRev?"—":n)+'</td><td>'+(p.min?p.min+" 分钟":"—")+'</td><td>'+p.goal+'</td>'
+      +'<td class="muted">'+esc(p.act)+'</td>'
+      +'<td>'+(isRev?'<button class="btn" data-goto="data">看统计</button>':'<button class="btn primary" data-start="'+p.d+'">开始</button>')+'</td></tr>'; }).join("")
+   +'</tbody></table>';
+  $$("#v-plan [data-day]").forEach(c=>c.onchange=()=>{ S.plan[c.dataset.day]=c.checked; save(true); renderPlan(); });
+  $$("#v-plan [data-start]").forEach(b=>b.onclick=()=>{ const p=PLAN.find(x=>x.d===Number(b.dataset.start)); const ids=selIds(p.sel);
+    if(!ids.length) return toast("这一组暂时没有题（错题本可能是空的）");
+    startSet(ids,{label:"D"+p.d+" "+p.t,minutes:p.min}); });
+  $$("#v-plan [data-goto]").forEach(b=>b.onclick=()=>go(b.dataset.goto));
+  $$("#v-plan [data-free]").forEach(b=>b.onclick=()=>{
+    const v=b.dataset.free;
+    if(v.startsWith("t:")){ const ids=QS.filter(q=>isGen(q)&&q.topic===v.slice(2)).map(q=>q.id); startSet(ids,{label:v.slice(2)+"专练"}); }
+    else startSet(selIds({k:"rand",n:Number(v)}),{label:"随机 "+v+" 题"});
+  });
+  $("#prst").onclick=()=>{ S.plan={}; save(true); renderPlan(); };
+}
+
+/* ---------------- 速查卡 ---------------- */
+function renderQuick(){
+  const tips={}; QS.forEach(q=>{ if(q.sectionTip&&!tips[q.topic]) tips[q.topic]=q.sectionTip; });
+  const mtips={}; QS.forEach(q=>{ if(q.moduleTip&&!mtips[q.module]) mtips[q.module]=q.moduleTip; });
+  $("#v-quick").innerHTML=
+   '<div class="card"><h2>各题型通用破题顺序</h2>'
+   +Object.keys(mtips).map(m=>'<div class="nbox"><b>'+esc(m)+'</b>：'+mdEsc(mtips[m])+'</div>').join("")
+   +'<h3>分题型</h3>'
+   +Object.keys(tips).map(t=>'<div class="nbox"><b>'+esc(t)+'</b>：'+mdEsc(tips[t])+'</div>').join("")
+   +'</div>'
+   +'<div class="card"><h2>附录 A · 技巧速查卡</h2>'+APPENDIX.A+'</div>'
+   +'<div class="card"><h2>附录 B · 赛道差异与时间分配</h2>'+APPENDIX.B+'</div>'
+   +'<div class="card"><h2>附录 C · 考场兜底法则</h2>'+APPENDIX.C+'</div>'
+   +'<div class="card"><h2>银行 EPI 计时参考（公开题型题量整理）</h2>'
+   +'<table class="list"><thead><tr><th>银行</th><th>EPI/通用能力考查内容</th><th>题量</th><th>单元用时</th><th>折算单题</th></tr></thead><tbody>'
+   +[["中国银行","逻辑推理、数学运算、言语理解、思维策略、资料分析","50 题","60 分钟","约 72 秒"],
+      ["中国农业银行","通用能力一：言语理解、数学运算、资料分析；通用能力二：逻辑推理、思维策略","23 + 22 题","—","—"],
+      ["中国工商银行","通用能力一：言语理解、数学运算、逻辑推理；通用能力二：思维策略、资料分析","34 + 24 题","39 + 32 分钟","约 70 秒"],
+      ["中国建设银行","综合能力一：言语理解、数量关系；综合能力二：逻辑推理、资料分析","34 + 31 题","40 + 55 分钟","约 83 秒"],
+      ["中国邮政储蓄银行","言语理解、逻辑推理、思维策略、资料分析","40 题","50 分钟","75 秒"],
+      ["交通银行","言语理解、逻辑推理、数学运算、思维策略、资料分析","40 题","—","—"]]
+     .map(r=>'<tr><td><b>'+r[0]+'</b></td><td>'+r[1]+'</td><td>'+r[2]+'</td><td>'+r[3]+'</td><td>'+r[4]+'</td></tr>').join("")
+   +'</tbody></table>'
+   +'<p class="muted" style="margin-top:10px">数据来源：<a href="https://tj.xbcjy.com/yhzp/jyjczs/5649534.html" target="_blank" rel="noreferrer">《国有六大行笔试内容及题型题量》</a>（按往年考生回忆整理）。各行每年题型题量与是否单元独立计时都会调整，只作节奏参考，务必以当年公告和考前模拟为准。</p>'
+   +'</div>';
+}
+
+/* ---------------- 数据 ---------------- */
+function renderData(){
+  const ids=Object.keys(S.rec).map(Number);
+  const done=ids.filter(answered);
+  const right=done.filter(id=>S.rec[id].correct).length;
+  const notes=ids.filter(id=>S.rec[id].note&&S.rec[id].note.trim()).length;
+  const favs=ids.filter(id=>S.rec[id].fav).length;
+  const doubts=ids.filter(id=>S.rec[id].doubt).length;
+  const wrongN=ids.filter(id=>S.rec[id].wrong>0).length;
+  const totalMs=ids.reduce((a,id)=>a+(S.rec[id].timeMs||0),0);
+  const acc=a=>a.length?Math.round(a.filter(id=>S.rec[id].correct).length/a.length*100)+"%":"—";
+  const doneOrig=done.filter(id=>!isGen(BY_ID[id]));
+  const doneGen=done.filter(id=>isGen(BY_ID[id]));
+  const modRows=MODULES.map(m=>{ const a=done.filter(id=>BY_ID[id].module===m); const all=QS.filter(q=>q.module===m).length;
+    return "<tr><td>"+esc(m)+"</td><td>"+a.length+"/"+all+"</td><td>"+acc(a)+"</td><td>"
+      +a.filter(id=>S.rec[id].wrong>0).length+"</td></tr>"; }).join("");
+  const topRows=TOPICS.map(t=>{ const a=done.filter(id=>BY_ID[id].topic===t);
+    return "<tr><td>"+esc(t)+"</td><td>"+QS.filter(q=>q.topic===t).length+"</td><td>"+a.length+"</td><td>"+acc(a)+"</td></tr>"; }).join("");
+  const doubtList=ids.filter(id=>S.rec[id].doubt).sort((a,b)=>a-b);
+  $("#v-data").innerHTML='<div class="card"><h2>学习数据</h2><div class="stats">'
+   +'<div class="stat"><b>'+done.length+'/'+QS.length+'</b><span>已做题数</span></div>'
+   +'<div class="stat"><b>'+(done.length?Math.round(right/done.length*100)+"%":"—")+'</b><span>总正确率</span></div>'
+   +'<div class="stat"><b>'+wrongN+'</b><span>错题（含曾错）</span></div>'
+   +'<div class="stat"><b>'+notes+'</b><span>写了思路</span></div>'
+   +'<div class="stat"><b>'+favs+'</b><span>收藏</span></div>'
+   +'<div class="stat"><b>'+doubts+'</b><span>存疑</span></div>'
+   +'<div class="stat"><b>'+fmtClock(totalMs)+'</b><span>累计作答时长</span></div>'
+   +'<div class="stat"><b>'+acc(doneOrig)+'</b><span>原题正确率（'+doneOrig.length+'/'+N_ORIG+'）</span></div>'
+   +'<div class="stat"><b>'+acc(doneGen)+'</b><span>生成题正确率（'+doneGen.length+'/'+N_GEN+'）</span></div>'
+   +'</div></div>'
+   +'<div class="card"><h2>按模块</h2><table class="list"><thead><tr><th>模块</th><th>已做/总数</th><th>正确率</th><th>错题</th></tr></thead><tbody>'+modRows+'</tbody></table></div>'
+   +'<div class="card"><h2>按题型</h2><table class="list"><thead><tr><th>题型</th><th>题量</th><th>已做</th><th>正确率</th></tr></thead><tbody>'+topRows+'</tbody></table></div>'
+   +(doubtList.length?'<div class="card"><h2>存疑题（待你自己核实）</h2><p class="muted">这些题的答案你觉得可能有问题，列出来方便集中核对。</p><p>'
+      +doubtList.map(id=>'<a href="javascript:void(0)" onclick="jump('+id+')">第 '+id+' 题</a>').join("　")+'</p></div>':'')
+   +'<div class="card"><h2>数据管理</h2>'
+   +'<p class="muted">所有进度、错题、笔记只存在本机浏览器（localStorage），不会上传。<b>换浏览器、清理浏览器数据或换电脑前，先导出备份。</b></p>'
+   +'<div class="row" style="margin-top:10px">'
+   +'<button class="btn primary" id="exp">导出全部数据（JSON 备份）</button>'
+   +'<button class="btn" id="impBtn">导入 JSON 备份</button>'
+   +'<input type="file" id="imp" accept=".json" style="display:none">'
+   +'<button class="btn" id="expMD">导出错题本 Markdown</button>'
+   +'<button class="btn" id="expNotes">导出我的思路 Markdown</button>'
+   +'<span class="spacer"></span>'
+   +'<button class="btn" id="clrRec">清空做题记录</button>'
+   +'<button class="btn" id="clrNote">清空笔记</button>'
+   +'<button class="btn" id="clrAll">全部重置</button>'
+   +'</div></div>';
+  $("#exp").onclick=()=>download("行测题库数据备份-"+new Date().toISOString().slice(0,10)+".json", JSON.stringify(S,null,1), "application/json");
+  $("#impBtn").onclick=()=>$("#imp").click();
+  $("#imp").onchange=e=>{ const f=e.target.files[0]; if(!f) return;
+    const rd=new FileReader(); rd.onload=()=>{ try{ const o=JSON.parse(rd.result); if(!o.rec) throw 0;
+      const keepId=Object.keys(S.rec).some(k=>S.rec[k].note&&S.rec[k].note.trim());
+      if(keepId && !confirm("当前已有笔记/进度，导入会覆盖。继续？")) return;
+      S=Object.assign(blank(),o); save(true); go("data"); toast("导入成功"); }catch(err){ alert("文件格式不对，需要本页导出的 JSON"); } };
+    rd.readAsText(f); };
+  $("#expMD").onclick=()=>{ const w=Object.keys(S.rec).filter(isWrong).map(Number).sort((a,b)=>a-b);
+    if(!w.length) return toast("错题本是空的"); download("错题本.md", wrongMD(w), "text/markdown;charset=utf-8"); };
+  $("#expNotes").onclick=()=>{ const ids=QS.filter(q=>S.rec[q.id]&&S.rec[q.id].note&&S.rec[q.id].note.trim()).map(q=>q.id);
+    if(!ids.length) return toast("还没写笔记");
+    const L=["# 我的行测解题思路",""]; ids.forEach(id=>{ const q=BY_ID[id]; L.push("## 第 "+id+" 题 · "+q.topic,"",stemText(q),"",S.rec[id].note,"","---",""); });
+    download("我的思路.md", L.join("\n"), "text/markdown;charset=utf-8"); };
+  $("#clrRec").onclick=()=>{ if(!confirm("清空做题记录与错题（笔记保留）？")) return;
+    Object.keys(S.rec).forEach(id=>{ S.rec[id].picked=null; S.rec[id].correct=null; S.rec[id].wrong=0; S.rec[id].tries=0; S.rec[id].timeMs=0; });
+    save(true); renderData(); renderTabs(); toast("已清空做题记录"); };
+  $("#clrNote").onclick=()=>{ if(!confirm("清空所有笔记？建议先导出。")) return;
+    Object.keys(S.rec).forEach(id=>S.rec[id].note=""); save(true); renderData(); renderTabs(); toast("已清空笔记"); };
+  $("#clrAll").onclick=()=>{ if(!confirm("全部重置（进度、错题、笔记、计划勾选）？此操作不可撤销。")) return;
+    S=blank(); save(true); renderData(); renderTabs(); toast("已重置"); };
+}
+
+/* ---------------- 键盘 ---------------- */
+document.addEventListener("keydown",e=>{
+  if(view!=="practice") return;
+  const tag=(e.target.tagName||"").toLowerCase();
+  if(tag==="textarea"||tag==="input") return;
+  const k=e.key.toUpperCase();
+  if(["1","2","3","4","A","B","C","D"].includes(k)){
+    const m={"1":"A","2":"B","3":"C","4":"D"};
+    pick(m[k]||k); e.preventDefault(); return;
+  }
+  if(e.key===" "||e.key==="Enter"){ showAna=!showAna; showTip=true; renderPractice(); e.preventDefault(); return; }
+  if(e.key==="ArrowRight"){ next(1); e.preventDefault(); }
+  if(e.key==="ArrowLeft"){ if(idx>0){idx--;showTip=showAna=false;renderPractice();} e.preventDefault(); }
+  if(k==="F"){ const r=R(cur().id); r.fav=!r.fav; save(); renderPractice(); }
+});
+
+/* ---------------- 启动 ---------------- */
+window.addEventListener("beforeunload",()=>{ bankTime(); save(true); });
+window.addEventListener("hashchange",()=>{ if(!suppressHash) applyRoute(); });
+document.addEventListener("visibilitychange",()=>{ if(document.hidden){ bankTime(); save(true); } });
+/* 有网就是网站：注册 Service Worker 支持离线与「添加到主屏幕」；file:// 下自动跳过 */
+if(typeof navigator!=="undefined" && navigator.serviceWorker && /^https?:$/.test(location.protocol)){
+  window.addEventListener("load",()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
+}
+document.title="秋招行测题库 · 银行 EPI "+QS.length+" 题";
+const _sub=document.getElementById("hdsub"); if(_sub) _sub.textContent="银行 EPI · 原题 "+N_ORIG+" + 生成 "+N_GEN+" · 离线可用";
+renderTabs();
+if(location.hash) applyRoute(); else go("list");
+</script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="666" height="260" viewBox="0 0 1000 390" font-family="Helvetica,Arial,sans-serif">
+<rect x="20.0" y="30.0" width="172" height="140" rx="8" fill="#fcfcfc" stroke="#dcdcdc"/>
+<rect x="70.3" y="64.3" width="71.4" height="71.4" fill="none" stroke="#1a1a1a" stroke-width="2.4"/>
+<line x1="70.3" y1="64.3" x2="141.7" y2="135.7" stroke="#1a1a1a" stroke-width="2.4" stroke-linecap="round"/>
+<rect x="202.0" y="30.0" width="172" height="140" rx="8" fill="#fcfcfc" stroke="#dcdcdc"/>
+<rect x="252.3" y="64.3" width="71.4" height="71.4" fill="none" stroke="#1a1a1a" stroke-width="2.4"/>
+<line x1="252.3" y1="100.0" x2="323.7" y2="100.0" stroke="#1a1a1a" stroke-width="2.4" stroke-linecap="round"/>
+<rect x="384.0" y="30.0" width="172" height="140" rx="8" fill="#fcfcfc" stroke="#dcdcdc"/>
+<circle cx="470.0" cy="100.0" r="37.8" fill="none" stroke="#1a1a1a" stroke-width="2.4"/>
+<line x1="432.2" y1="100.0" x2="507.8" y2="100.0" stroke="#1a1a1a" stroke-width="2.4" stroke-linecap="round"/>
+<rect x="566.0" y="30.0" width="172" height="140" rx="8" fill="#fcfcfc" stroke="#dcdcdc"/>
+<rect x="618.4" y="66.4" width="33.6" height="33.6" fill="none" stroke="#1a1a1a" stroke-width="2.4"/>
+<rect x="652.0" y="100.0" width="33.6" height="33.6" fill="none" stroke="#1a1a1a" stroke-width="2.4"/>
+<rect x="141.0" y="215.0" width="172" height="140" rx="8" fill="#fcfcfc" stroke="#dcdcdc"/>
+<rect x="191.3" y="249.3" width="71.4" height="71.4" fill="none" stroke="#1a1a1a" stroke-width="2.4"/>
+<line x1="191.3" y1="285.0" x2="262.7" y2="285.0" stroke="#1a1a1a" stroke-width="2.4" stroke-linecap="round"/>
+<line x1="227.0" y1="249.3" x2="227.0" y2="320.7" stroke="#1a1a1a" stroke-width="2.4" stroke-linecap="round"/>
+<text x="227.0" y="207.0" font-size="16" text-anchor="middle" fill="#666">A</text>
+<rect x="323.0" y="215.0" width="172" height="140" rx="8" fill="#fcfcfc" stroke="#dcdcdc"/>
+<rect x="373.3" y="249.3" width="71.4" height="71.4" fill="none" stroke="#1a1a1a" stroke-width="2.4"/>
+<line x1="373.3" y1="273.2" x2="444.7" y2="273.2" stroke="#1a1a1a" stroke-width="2.4" stroke-linecap="round"/>
+<line x1="373.3" y1="296.8" x2="444.7" y2="296.8" stroke="#1a1a1a" stroke-width="2.4" stroke-linecap="round"/>
+<text x="409.0" y="207.0" font-size="16" text-anchor="middle" fill="#666">B</text>
+<rect x="505.0" y="215.0" width="172" height="140" rx="8" fill="#fcfcfc" stroke="#dcdcdc"/>
+<polygon points="591.0,245.1 625.6,304.9 556.4,304.9" fill="none" stroke="#1a1a1a" stroke-width="2.4" stroke-linejoin="round"/>
+<line x1="591.0" y1="285.0" x2="591.0" y2="245.1" stroke="#1a1a1a" stroke-width="2.4" stroke-linecap="round"/>
+<line x1="591.0" y1="285.0" x2="625.6" y2="304.9" stroke="#1a1a1a" stroke-width="2.4" stroke-linecap="round"/>
+<line x1="591.0" y1="285.0" x2="556.4" y2="304.9" stroke="#1a1a1a" stroke-width="2.4" stroke-linecap="round"/>
+<text x="591.0" y="207.0" font-size="16" text-anchor="middle" fill="#666">C</text>
+<rect x="687.0" y="215.0" width="172" height="140" rx="8" fill="#fcfcfc" stroke="#dcdcdc"/>
+<polygon points="773.0,243.0 783.4,270.7 812.9,272.0 789.8,290.5 797.7,319.0 773.0,302.6 748.3,319.0 756.2,290.5 733.1,272.0 762.6,270.7" fill="none" stroke="#1a1a1a" stroke-width="2.4" stroke-linejoin="round"/>
+<text x="773.0" y="207.0" font-size="16" text-anchor="middle" fill="#666">D</text>
+</svg>

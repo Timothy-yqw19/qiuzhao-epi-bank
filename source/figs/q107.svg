@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="666" height="260" viewBox="0 0 1000 390" font-family="Helvetica,Arial,sans-serif">
+<rect x="20.0" y="30.0" width="172" height="140" rx="8" fill="#fcfcfc" stroke="#dcdcdc"/>
+<circle cx="106.0" cy="100.0" r="23.1" fill="none" stroke="#1a1a1a" stroke-width="2.4"/>
+<path d="M 64.0 100.0 A 42.0 27.7 0 0 1 148.0 100.0" fill="none" stroke="#1a1a1a" stroke-width="2.4"/>
+<rect x="202.0" y="30.0" width="172" height="140" rx="8" fill="#fcfcfc" stroke="#dcdcdc"/>
+<polyline points="246.0,70.6 330.0,85.3 246.0,100.0 330.0,114.7 246.0,129.4" fill="none" stroke="#1a1a1a" stroke-width="2.4" stroke-linejoin="round"/>
+<rect x="384.0" y="30.0" width="172" height="140" rx="8" fill="#fcfcfc" stroke="#dcdcdc"/>
+<circle cx="470.0" cy="100.0" r="23.1" fill="none" stroke="#1a1a1a" stroke-width="2.4"/>
+<path d="M 428.0 100.0 A 42.0 27.7 0 0 1 512.0 100.0" fill="none" stroke="#1a1a1a" stroke-width="2.4"/>
+<rect x="566.0" y="30.0" width="172" height="140" rx="8" fill="#fcfcfc" stroke="#dcdcdc"/>
+<polyline points="610.0,70.6 694.0,85.3 610.0,100.0 694.0,114.7 610.0,129.4" fill="none" stroke="#1a1a1a" stroke-width="2.4" stroke-linejoin="round"/>
+<rect x="748.0" y="30.0" width="172" height="140" rx="8" fill="#fcfcfc" stroke="#dcdcdc"/>
+<text x="834.0" y="110.0" font-size="30" text-anchor="middle" fill="#999">?</text>
+<rect x="141.0" y="215.0" width="172" height="140" rx="8" fill="#fcfcfc" stroke="#dcdcdc"/>
+<circle cx="227.0" cy="285.0" r="23.1" fill="none" stroke="#1a1a1a" stroke-width="2.4"/>
+<path d="M 185.0 285.0 A 42.0 27.7 0 0 1 269.0 285.0" fill="none" stroke="#1a1a1a" stroke-width="2.4"/>
+<text x="227.0" y="207.0" font-size="16" text-anchor="middle" fill="#666">A</text>
+<rect x="323.0" y="215.0" width="172" height="140" rx="8" fill="#fcfcfc" stroke="#dcdcdc"/>
+<polyline points="367.0,255.6 451.0,270.3 367.0,285.0 451.0,299.7 367.0,314.4" fill="none" stroke="#1a1a1a" stroke-width="2.4" stroke-linejoin="round"/>
+<text x="409.0" y="207.0" font-size="16" text-anchor="middle" fill="#666">B</text>
+<rect x="505.0" y="215.0" width="172" height="140" rx="8" fill="#fcfcfc" stroke="#dcdcdc"/>
+<polygon points="620.7,314.7 561.3,314.7 561.3,255.3 620.7,255.3" fill="none" stroke="#1a1a1a" stroke-width="2.4" stroke-linejoin="round"/>
+<text x="591.0" y="207.0" font-size="16" text-anchor="middle" fill="#666">C</text>
+<rect x="687.0" y="215.0" width="172" height="140" rx="8" fill="#fcfcfc" stroke="#dcdcdc"/>
+<circle cx="758.3" cy="274.5" r="18.9" fill="none" stroke="#1a1a1a" stroke-width="2.4"/>
+<line x1="735.2" y1="316.5" x2="810.8" y2="261.9" stroke="#1a1a1a" stroke-width="2.4" stroke-linecap="round"/>
+<text x="773.0" y="207.0" font-size="16" text-anchor="middle" fill="#666">D</text>
+</svg>

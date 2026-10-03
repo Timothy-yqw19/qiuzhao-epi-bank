@@ -1,0 +1,29 @@
+{
+ "name": "秋招行测题库 · 银行 EPI 行测刷题",
+ "short_name": "行测题库",
+ "description": "银行 EPI 行测刷题库：手写真题/仿真题 + 按考点批量生成的练习题，每题带破题技巧与解析，支持思路笔记、错题本与 21 天刷题计划。",
+ "start_url": "./",
+ "scope": "./",
+ "display": "standalone",
+ "background_color": "#f5f6f8",
+ "theme_color": "#2f6df6",
+ "lang": "zh-CN",
+ "icons": [
+  {
+   "src": "icons/icon-192.png",
+   "sizes": "192x192",
+   "type": "image/png"
+  },
+  {
+   "src": "icons/icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png"
+  },
+  {
+   "src": "icons/icon-maskable-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "maskable"
+  }
+ ]
+}

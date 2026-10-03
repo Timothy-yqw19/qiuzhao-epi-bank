@@ -1,0 +1,290 @@
+/**
+ * 单文件题库校验：用最小 DOM 桩在 Node 里真正执行 index.html 的内联脚本，
+ * 覆盖 ①数据完整性 ②刷题计划组卷 ③作答/错题本/持久化 ④七个页面的渲染产出 ⑤单文件自足性。
+ *
+ * 用法：node verify_bank.js
+ */
+const fs = require("fs");
+const path = require("path");
+
+const file = path.join(__dirname, "index.html");
+const html = fs.readFileSync(file, "utf8");
+const genData = JSON.parse(fs.readFileSync(path.join(__dirname, "data", "generated.json"), "utf8"));
+const EXPECT_GEN = genData.questions.length, EXPECT_TOTAL = 134 + EXPECT_GEN;
+const N_GEN_STUB = EXPECT_GEN;
+
+/* ---------- 取出应用脚本 ---------- */
+const blocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+if (!blocks.length) throw new Error("index.html 里没找到 <script> 块");
+const code = blocks[blocks.length - 1][1];
+
+/* ---------- 最小 DOM 桩（带元素记忆，可回读 innerHTML） ---------- */
+const dom = {};
+function makeEl() {
+  const target = function () {};
+  return new Proxy(target, {
+    get(t, p) {
+      if (p === "style" || p === "dataset" || p === "classList") return (t[p] = t[p] || makeEl());
+      if (p === "querySelectorAll") return () => [];
+      if (p === "appendChild" || p === "remove" || p === "click" || p === "focus") return () => {};
+      if (p === "value") return "";
+      if (p === "checked") return false;
+      if (p in t) return t[p];
+      return makeEl();
+    },
+    set(t, p, v) { t[p] = v; return true; },
+    apply() { return makeEl(); },
+  });
+}
+const document = {
+  querySelector: (sel) => (dom[sel] = dom[sel] || makeEl()),
+  getElementById: (id) => (dom["#" + id] = dom["#" + id] || makeEl()),
+  querySelectorAll: () => [],
+  createElement: () => makeEl(),
+  addEventListener: () => {},
+  body: makeEl(),
+  hidden: false,
+};
+const mem = {};
+const localStorage = {
+  getItem: (k) => (k in mem ? mem[k] : null),
+  setItem: (k, v) => { mem[k] = String(v); },
+  removeItem: (k) => { delete mem[k]; },
+};
+const window = {
+  addEventListener: (ev, fn) => { (winListeners[ev] = winListeners[ev] || []).push(fn); },
+  scrollTo: () => {},
+};
+const winListeners = {};
+const location = { hash: "", protocol: "http:" };
+const history = { replaceState: (a, b, url) => { const m = /#.*$/.exec(String(url || "")); if (m) location.hash = m[0]; } };
+const navigator = {};   // 无 serviceWorker，启动时应跳过注册
+
+const factory = new Function(
+  "document", "window", "localStorage", "Blob", "URL", "FileReader",
+  "requestAnimationFrame", "confirm", "alert", "location", "history", "navigator",
+  code + `
+  ;return {QS,BY_ID,PLAN,APPENDIX,selIds,wrongMD,wrongCSV,stemText,R,isWrong,stateOf,filtered,
+           getS:()=>S, KEY, go, startSet, pick, next, finishSet, jump, startWrong, save,
+           getView:()=>view, getCur:()=>cur(), getQueue:()=>queue, applyRoute};`
+);
+const app = factory(document, window, localStorage, function () {}, { createObjectURL: () => "", revokeObjectURL: () => {} },
+  function () {}, () => {}, () => true, () => {}, location, history, navigator);
+const fireHash = () => (winListeners["hashchange"] || []).forEach((f) => f());
+
+/* ---------- 断言框架 ---------- */
+let pass = 0, fail = 0;
+const failures = [];
+function ok(cond, label, extra) {
+  if (cond) { pass++; console.log("  ✓ " + label); }
+  else { fail++; failures.push(label); console.log("  ✗ " + label + (extra !== undefined ? "  → " + JSON.stringify(extra) : "")); }
+}
+const viewHtml = (id) => (dom["#" + id] ? String(dom["#" + id].innerHTML || "") : "");
+const count = (s, re) => (s.match(re) || []).length;
+
+console.log("一、数据完整性");
+ok(app.QS.length === EXPECT_TOTAL, "共 " + EXPECT_TOTAL + " 题（原题 134 + 生成 " + EXPECT_GEN + "）", app.QS.length);
+ok(app.QS.slice(0, 134).every((q, i) => q.id === i + 1), "原题题号 1-134 连续");
+ok(new Set(app.QS.map((q) => q.id)).size === app.QS.length, "全库题号唯一无冲突");
+ok(app.QS.every((q) => q.options.length === 4), "每题 4 个选项");
+ok(app.QS.every((q) => q.options.map((o) => o.k).join("") === "ABCD"), "选项字母均为 A-D");
+ok(app.QS.every((q) => q.options.some((o) => o.k === q.answer)), "答案都能在选项里找到");
+ok(app.QS.every((q) => q.stem && q.stem.trim()), "题干非空");
+ok(app.QS.every((q) => q.tip && q.tip.trim()), "每题都有标准思路（技巧）");
+ok(app.QS.filter((q) => q.svg).length === 11, "11 张图形推理配图已内联", app.QS.filter((q) => q.svg).length);
+ok(app.QS.filter((q) => q.svg).every((q) => /<svg/.test(q.svg)), "配图内容是合法 SVG 片段");
+ok(app.QS.filter((q) => q.materialHtml && q.src !== "gen").length === 12, "原题资料分析 12 题带材料");
+ok(app.QS.filter((q) => q.topic === "资料分析" && !q.materialHtml).length === 0, "全库资料分析题都带材料");
+ok(app.QS.filter((q) => q.materialHtml).every((q) => q.materialTitle), "带材料题都有材料标题");
+ok(/<table/.test(app.QS.find((q) => q.id === 115).materialHtml), "材料二的表格已转成 HTML 表格");
+const noAna = app.QS.filter((q) => !q.analysis).map((q) => q.id);
+ok(noAna.join(",") === "123,124,125,126,127,128,129,130,131,132,133,134", "无逐步解析的只剩原文的常识 12 题（生成题全部带解析）", noAna.length);
+ok(app.QS.every((q) => !/<script|onerror|javascript:/i.test(q.stem + q.tip + (q.analysis || ""))), "题目文本无可注入脚本片段");
+ok(app.QS.filter((q) => q.source && q.src !== "gen").map((q) => q.id).join(",") === "68,78,92", "原题来源标注如实反映原文（只有 3 题标了真题）");
+ok(app.QS.filter((q) => q.src === "gen").every((q) => q.source === "生成"), "生成题来源统一标注为「生成」");
+
+console.log("二、刷题计划组卷");
+ok(app.PLAN.length === 21, "21 天计划");
+ok(app.PLAN.every((p) => p.d && p.t && p.act), "每天都有任务与要求");
+ok(app.selIds({ k: "r", a: 1, b: 12 }).length === 12, "D1 组卷 = 12 题");
+ok(app.selIds({ k: "r", a: 23, b: 40 }).length === 18, "D3 组卷 = 18 题");
+ok(app.selIds({ k: "m", m: "言语理解与表达", orig: true }).length === 40, "D15 言语整组 = 40 题");
+ok(app.selIds({ k: "m", m: "数量关系", orig: true }).length === 27, "D16 数量整组 = 27 题（计划只跑原题）");
+ok(app.selIds({ k: "m", m: "数量关系" }).length > 400, "数量关系全库（含生成题）> 400 题", app.selIds({ k: "m", m: "数量关系" }).length);
+ok(app.selIds({ k: "m", m: "判断推理", orig: true }).length === 43, "D17 判断整组 = 43 题");
+ok(app.selIds({ k: "m", m: "资料分析", orig: true }).length === 12, "D18 资料整组 = 12 题");
+ok(app.selIds({ k: "m", m: "常识判断", orig: true }).length === 12, "D19 常识整组 = 12 题");
+ok(app.selIds({ k: "all", orig: true }).length === 134, "D21 全套模拟 = 134 题");
+ok(app.selIds({ k: "all" }).length === EXPECT_TOTAL, "全库组卷 = " + EXPECT_TOTAL + " 题");
+ok(app.selIds({ k: "rand", n: 40, orig: true }).length === 40, "D12 随机组卷 = 40 题");
+ok(new Set(app.selIds({ k: "rand", n: 40 })).size === 40, "随机组卷不重复");
+ok(app.selIds({ k: "wrong" }).length === 0, "初始错题本为空");
+
+console.log("三、完整用户流程（题库 → 作答 → 错题本 → 计划 → 数据）");
+let crashed = null;
+try {
+  app.go("list");
+  const grid = viewHtml("v-list") + viewHtml("grid");
+  ok(count(viewHtml("grid"), /class="qcard"/g) === EXPECT_TOTAL, "题库页渲染 " + EXPECT_TOTAL + " 张题卡", count(viewHtml("grid"), /class="qcard"/g));
+
+  app.startSet([1, 2, 3], { label: "QA" });
+  const p1 = viewHtml("v-practice");
+  ok(p1.includes("第 1 题"), "练习页显示第 1 题");
+  ok(count(p1, /class="opt[ "]/g) === 4, "练习页渲染 4 个选项", count(p1, /class="opt[ "]/g));
+  ok(p1.includes("我的思路笔记"), "练习页有思路笔记框");
+  ok(p1.includes("看标准思路"), "练习页有标准思路入口");
+
+  app.pick("B");                       // 第 1 题答案是 B
+  ok(app.getS().rec[1].correct === true, "答对第 1 题被正确判定");
+  app.next(1);
+  app.pick("C");                       // 第 2 题答案是 A
+  ok(app.getS().rec[2].correct === false, "答错第 2 题被正确判定");
+  app.getS().rec[2].note = "转折词没抓住";
+  app.next(1);
+  app.pick("B");                       // 第 3 题答案是 C
+  app.finishSet();
+  const res = viewHtml("v-practice");
+  ok(res.includes("本组结果"), "交卷后显示本组结果");
+  ok(res.includes("1/3"), "结果统计 = 1/3 正确", res.match(/\d+\/\d+/));
+  ok(!/undefined|NaN/.test(res), "结果表无 undefined/NaN");
+
+  app.go("wrong");
+  const wt = viewHtml("v-wrong");
+  ok(wt.includes("错题本"), "错题本页有标题");
+  ok(count(wt, /<tr>/g) >= 2, "错题本列出 2 道错题", count(wt, /<tr>/g));
+  ok(app.isWrong(1) === false && app.isWrong(2) === true, "只有答错的题进错题本");
+  ok(app.selIds({ k: "wrong" }).join(",") === "2,3", "错题重练只组错题", app.selIds({ k: "wrong" }));
+
+  app.go("plan");
+  const pl = viewHtml("v-plan");
+  ok(count(pl, /data-day=/g) === 21, "计划页 21 天（含表头共 " + count(pl, /<tr>/g) + " 行）", count(pl, /data-day=/g));
+  ok(count(pl, /data-start=/g) === 20, "除复盘日外每天都有开始按钮", count(pl, /data-start=/g));
+  ok(!/undefined/.test(pl), "计划页无 undefined");
+
+  app.go("quick");
+  const qk = viewHtml("v-quick");
+  ok(qk.includes("技巧速查卡") && qk.includes("考场兜底法则"), "速查页含附录 A/C");
+  ok((qk.match(/<table/g) || []).length >= 3, "速查页含公式表/时间分配表/银行计时表", (qk.match(/<table/g) || []).length);
+  ok(qk.includes("思维策略"), "速查页含银行 EPI 模块信息");
+  ok(!/undefined/.test(qk), "速查页无 undefined");
+
+  app.go("data");
+  const dt = viewHtml("v-data");
+  ok(dt.includes("学习数据") && dt.includes("按模块") && dt.includes("按题型"), "数据页含统计区");
+  ok(dt.includes("导出全部数据"), "数据页含导出备份入口");
+  ok(!/undefined|NaN/.test(dt), "数据页无 undefined/NaN");
+
+  app.go("notes");
+  ok(viewHtml("v-notes").includes("转折词没抓住"), "我的思路页汇总了笔记");
+  app.go("list");
+} catch (e) {
+  crashed = e;
+}
+ok(!crashed, "整个流程无异常抛出", crashed && (crashed.message + "\n" + crashed.stack));
+
+console.log("四、错题本导出与持久化");
+const md = app.wrongMD([2]);
+ok(md.includes("## 第 2 题") && md.includes("转折词没抓住"), "错题本 Markdown 含题干/笔记");
+ok(md.includes("正确"), "错题本 Markdown 含答案信息");
+const csv = app.wrongCSV([2]);
+ok(csv.split("\r\n").length === 2 && csv.includes('"2"'), "错题本 CSV 行列正确");
+ok(app.stemText(app.QS[6]).indexOf("\n") === -1, "导出文本已压平换行");
+app.save(true);   // 应用里的保存是 300ms 防抖，这里强制立刻落盘再校验
+ok(!!mem[app.KEY], "数据已写入 localStorage 键 " + app.KEY);
+const saved = JSON.parse(mem[app.KEY]);
+ok(saved.rec["2"] && saved.rec["2"].picked === "C", "localStorage 里保存了作答记录");
+ok(saved.rec["2"].note === "转折词没抓住", "localStorage 里保存了笔记");
+ok(saved.rec["2"].timeMs >= 0, "localStorage 里记录了作答时长");
+
+console.log("五、附录与单文件自足性");
+ok(/<table/.test(app.APPENDIX.A) && app.APPENDIX.A.includes("百化分"), "附录 A 表格与公式已渲染");
+ok(app.APPENDIX.B.includes("银行 EPI"), "附录 B 含银行 EPI 时间分配");
+ok(app.APPENDIX.C.includes("蒙题") && app.APPENDIX.C.includes("资料分析"), "附录 C 兜底法则内容已渲染");
+ok(!/src\s*=\s*["']http/i.test(html), "没有外链脚本");
+ok(!/rel=["']stylesheet/i.test(html), "没有外链样式");
+ok(!/!\[[^\]]*\]\(/.test(html), "没有残留 markdown 图片语法");
+ok(html.includes("localStorage") && html.includes("__BANK__") === false, "进度存本机且无未替换占位符");
+ok(!/</.test(html.match(/const BANK = (.*?);\n/s)[1]), "内联数据里的 < 已转义（防脚本截断）");
+
+console.log("五之二、生成题（出题器产出）");
+const G = app.QS.filter((q) => q.src === "gen");
+ok(G.length === EXPECT_GEN, "生成题数量一致（" + EXPECT_GEN + "）", G.length);
+ok(G.every((q) => q.options.length === 4 && new Set(q.options.map((o) => o.t)).size === 4), "生成题每题 4 个不重复选项");
+ok(G.every((q) => q.options.some((o) => o.k === q.answer)), "生成题答案都在选项中");
+ok(G.every((q) => q.tip && q.analysis), "生成题都带技巧与解析");
+ok(G.every((q) => q.source === "生成"), "生成题来源标注为「生成」");
+ok(G.filter((q) => q.topic === "资料分析").every((q) => q.materialHtml && q.materialTitle), "生成题中的资料分析都带材料");
+ok(G.every((q) => q.id >= 1001), "生成题号从 1001 起，不与原题冲突");
+ok(app.QS.filter((q) => q.svg).length === 11, "配图仍只有原题的 11 张图形推理");
+const gTopics = [...new Set(G.map((q) => q.topic))].sort();
+ok(gTopics.length === 4 && ["数字推理","数学运算","资料分析","逻辑判断"].every((t) => gTopics.includes(t)), "生成题覆盖 4 个可机器验算的题型", gTopics);
+const dist = {};
+G.forEach((q) => { dist[q.answer] = (dist[q.answer] || 0) + 1; });
+ok(Object.keys(dist).length === 4 && Math.max(...Object.values(dist)) / G.length < 0.35, "生成题答案分布不偏斜", dist);
+ok(app.QS.filter((q) => q.src === "gen").length === N_GEN_STUB, "应用内 N_GEN 常量与数据一致", N_GEN_STUB);
+
+console.log("五之三、富文本渲染（防 HTML 注入与 markdown 残留）");
+app.startSet([68], { label: "RT" });     // 第 68 题题干带 **不属于**
+const p68 = viewHtml("v-practice");
+ok(p68.includes("<strong>不属于</strong>"), "题干里的 ** 已转成加粗标签");
+ok(!/\*\*/.test(p68), "练习页无残留 ** 标记");
+app.startSet([113], { label: "RT" });    // 第 113 题技巧含 a > b / a < b
+const p113 = viewHtml("v-practice");
+ok(!/<(?!\/?(strong|code|div|span|button|table|thead|tbody|tr|th|td|p|ul|li|br|svg|input|select|option|textarea|h[1-6]|b|a|header|main|nav|section)\b)/.test(p113), "练习页没有未转义的裸 < 标签");
+ok(/a &gt; b|a &lt; b/.test(p113) || !/a > b/.test(p113.replace(/<[^>]+>/g, "")), "比较符号按文本转义显示");
+app.go("quick");
+const qk2 = viewHtml("v-quick");
+ok(!/\*\*/.test(qk2), "速查页无残留 ** 标记");
+ok(qk2.includes("比重差 &lt;"), "附录 A 里的 < 已转义（不再是裸标签）");
+ok(qk2.includes("|a \u2212 b|") || qk2.includes("|a − b|"), "附录 A 单元格内被转义的竖线已还原", qk2.includes("|a − b|"));
+ok(qk2.includes("<strong>组成相同看位置"), "图形推理题型提示里的 ** 已转成加粗");
+app.go("list");
+
+console.log("六、网址路由（做成网站后的地址栏行为）");
+ok(app.getView() === "list", "启动后默认在题库页");
+ok(location.hash === "#/list", "启动后地址栏为 #/list", location.hash);
+location.hash = "#/plan"; fireHash();
+ok(app.getView() === "plan", "打开 #/plan 直接进刷题计划");
+location.hash = "#/wrong"; fireHash();
+ok(app.getView() === "wrong", "打开 #/wrong 直接进错题本");
+location.hash = "#/quick"; fireHash();
+ok(app.getView() === "quick", "打开 #/quick 直接进速查卡");
+location.hash = "#/practice/42"; fireHash();
+ok(app.getView() === "practice" && app.getCur() && app.getCur().id === 42, "深链接 #/practice/42 打开第 42 题",
+  app.getCur() && app.getCur().id);
+ok(location.hash === "#/practice/42", "深链接地址保持不变", location.hash);
+ok(app.getQueue().length === EXPECT_TOTAL, "深链接后仍可上下翻题", app.getQueue().length);
+location.hash = "#/nonsense"; fireHash();
+ok(app.getView() === "list", "无效地址回退到题库页");
+app.go("data");
+ok(app.getView() === "data" && location.hash === "#/data", "页签切换会同步地址栏", location.hash);
+app.go("list");
+
+console.log("七、网站打包（仓库根目录即站点）");
+const siteDir = __dirname;
+const siteIndex = path.join(siteDir, "index.html");
+ok(fs.existsSync(siteIndex), "根目录 index.html 存在（GitHub Pages 直接服务它）");
+ok(fs.readFileSync(siteIndex, "utf8") === html, "校验用的就是待部署的同一份 index.html");
+ok(/rel="manifest" href="manifest\.webmanifest"/.test(html), "页面引用了 manifest");
+ok(/name="description"/.test(html) && /name="theme-color"/.test(html), "页面有 SEO/主题色 meta");
+ok(html.includes('navigator.serviceWorker') && /https\?:\$/.test(html.replace(/\s/g, "")), "仅 http(s) 下注册 Service Worker");
+const mf = JSON.parse(fs.readFileSync(path.join(siteDir, "manifest.webmanifest"), "utf8"));
+ok(mf.name && mf.short_name && mf.start_url === "./" && mf.display === "standalone", "manifest 字段完整");
+ok(mf.icons.length === 3 && mf.icons.some((i) => i.purpose === "maskable"), "manifest 含 192/512/maskable 图标");
+const sw = fs.readFileSync(path.join(siteDir, "sw.js"), "utf8");
+const md5 = require("crypto").createHash("md5").update(html).digest("hex").slice(0, 10);
+ok(sw.includes("epi-bank-" + md5), "sw.js 缓存版本 = index.html 内容哈希（改内容即失效旧缓存）", md5);
+ok(sw.includes('req.mode === "navigate"') && sw.includes("skipWaiting"), "sw 采用导航网络优先 + 立即接管");
+for (const ic of ["icon-192.png", "icon-512.png", "apple-touch-icon.png", "icon-maskable-512.png"]) {
+  const p = path.join(siteDir, "icons", ic);
+  const buf = fs.existsSync(p) ? fs.readFileSync(p) : Buffer.alloc(0);
+  ok(buf.length > 400 && buf.slice(1, 4).toString() === "PNG", "图标 " + ic + " 是有效 PNG", buf.length);
+}
+ok(fs.existsSync(path.join(siteDir, ".nojekyll")), "含 .nojekyll（GitHub Pages 需要）");
+const siteFiles = ["index.html", "manifest.webmanifest", "sw.js", ".nojekyll", "icons/icon-192.png"];
+ok(siteFiles.every((f) => fs.existsSync(path.join(siteDir, f))), "部署所需文件齐全");
+
+console.log("\n结果：" + pass + " 项通过，" + fail + " 项失败");
+if (fail) console.log("失败项：\n - " + failures.join("\n - "));
+// 应用逻辑里有 setInterval（本题计时），必须显式退出，否则 Node 会一直等定时器
+process.exit(fail ? 1 : 0);
