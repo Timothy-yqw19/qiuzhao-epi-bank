@@ -2,7 +2,7 @@
 
 一个可以**当网站用、也可以离线双击用**的行测刷题应用。当前题库 **697 题** = 手写原题 134 + 出题器生成 563。
 
-- **网站版**：`site/` 目录，已经是可直接部署的静态站点（含 PWA：可离线、可「添加到主屏幕」）。本机已起服务：<http://127.0.0.1:8788/>
+- **网站版（GitHub Pages 部署用）**：**仓库根目录就是网站**，推到 GitHub 后开 Pages 即可（含 PWA：可离线、可「添加到主屏幕」）。本机已起服务：<http://127.0.0.1:8788/>
 - **单文件版**：`index.html`，双击即可用，不需要联网、不需要安装。
 
 ## 怎么用
@@ -68,18 +68,18 @@
 
 ## 网站部署
 
-`site/` 是纯静态站点，任意静态托管都能用：
+**仓库根目录即静态站点**，任意静态托管都能用：
 
 ```bash
 # 本地起服务（已在跑）
-python3 -m http.server 8788 --bind 127.0.0.1 --directory site
+python3 -m http.server 8788 --bind 127.0.0.1 --directory .
 
 # 局域网给手机用（换成本机内网 IP，注意会暴露给同网段设备）
-python3 -m http.server 8788 --bind 0.0.0.0 --directory site
+python3 -m http.server 8788 --bind 0.0.0.0 --directory .
 ```
 
-- **GitHub Pages**：把 `site/` 内容推到仓库（`index.html` 必须在根），仓库 Settings → Pages 选分支根目录即可。`.nojekyll` 已包含。
-- **Vercel / Netlify**：把 `site/` 拖进面板，或 `vercel deploy site`。
+- **GitHub Pages**：推到 GitHub 后，仓库 **Settings → Pages → Source 选 `Deploy from a branch`，分支 `main`、目录 `/(root)`**，保存后约 1 分钟生效，网址形如 `https://<用户名>.github.io/<仓库名>/`。`.nojekyll` 已包含，不需要额外配置。
+- **Vercel / Netlify**：导入这个仓库即可（无需构建命令、无需输出目录），或把根目录拖进面板。
 - PWA 的 Service Worker 需要 **https 或 localhost** 才生效；用 `file://` 打开时会自动跳过注册。
 - 离线策略：**页面网络优先**（更新立刻生效，断网回退缓存），图标等静态资源缓存优先；缓存版本号 = `index.html` 内容哈希，改内容即自动失效旧缓存。
 
@@ -92,7 +92,7 @@ NODE=/Users/wangsheng/.dsh/dsh-runtimes/dsh-primary-runtime/dependencies/node/bi
 $PY build_bank.py               # 源 md + figs/ → data/questions.json（134 道原题）
 $PY gen_quant.py                # 出题器 → data/generated.json（563 道生成题，自带反算自检）
 $PY build_html.py               # 合并两者 + app_template.html → index.html
-$PY build_site.py               # index.html → site/（manifest、sw.js、图标）
+$PY build_site.py               # 生成站点文件到根目录（manifest、sw.js、图标、.nojekyll）
 $NODE verify_bank.js            # 119 项校验（数据 / 计划 / 生成题 / 全流程 / 富文本转义 / 路由 / 站点打包）
 ```
 
@@ -105,16 +105,17 @@ $NODE verify_bank.js            # 119 项校验（数据 / 计划 / 生成题 / 
 
 ```
 秋招行测题库/
-├── index.html            # ★ 单文件版（约 595 KB，697 题 + 11 张内联 SVG）
-├── site/                 # ★ 网站版（部署这个目录）
-│   ├── index.html        #   与根目录 index.html 完全一致
-│   ├── manifest.webmanifest / sw.js / icons/ / .nojekyll
+├── index.html            # ★ 网站主页 / 单文件版（约 595 KB，697 题 + 11 张内联 SVG）
+├── manifest.webmanifest  # ★ PWA 清单
+├── sw.js                 # ★ Service Worker（离线）
+├── icons/                # ★ PWA 图标
+├── .nojekyll             # ★ GitHub Pages 用
 ├── README.md
 ├── app_template.html     # 界面模板（改界面用）
 ├── build_bank.py         # 源题库 md → 结构化 JSON
 ├── gen_quant.py          # 程序化出题器（内含逐题反算自检）
 ├── build_html.py         # 合并 + 生成 index.html
-├── build_site.py         # 生成 site/（PWA 图标、manifest、Service Worker）
+├── build_site.py         # 生成站点文件到根目录（PWA 图标、manifest、Service Worker）
 ├── verify_bank.js        # 119 项校验
 ├── parse_report.txt      # 原题解析告警报告
 ├── data/
