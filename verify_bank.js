@@ -430,7 +430,13 @@ if (fs.existsSync(localFile)) {
   ok(!/const BANK[\s\S]*"src":"zhenti"[\s\S]*?\nconst APPENDIX/.test(html) === false || true, "公网版与内嵌版是两个独立产物");
 }
 ok(!/zhentiInlined":true/.test(html.replace(/\s/g, "")), "公网 index.html 未内嵌真题");
-ok(/"zhenti":/.test(html) || /"src":"zhenti"/.test(html) === false, "公网 index.html 不含真题数据（仅含加载逻辑）");
+ok(!/"src":"zhenti"/.test(html), "公网 index.html 没有真题条目（仅含加载逻辑）");
+ok(!/"img":"data\/img/.test(html), "公网 index.html 没有本机图片路径");
+// 决定性泄漏判据：某道真题的「题干 + 四个选项」同时出现在公网页面里才算泄漏。
+// （只比对题干前 24 字会误报——图形推理的指令句与手写题第 100 题恰好同文案。）
+const leaked = (ZHENTI ? ZHENTI.questions : []).filter((q) =>
+  html.includes(q.stem) && q.options.every((o) => html.includes(o.t)));
+ok(leaked.length === 0, "公网页面零真题泄漏（题干+四选项同时命中 " + leaked.length + " 条）", leaked.slice(0, 2).map((q) => q.id));
 
 console.log("五之八、难度分层 / 配图 / 测评限时（针对『题太简单』）");
 const Z2 = app.getQS().filter((q) => q.src === "zhenti");
