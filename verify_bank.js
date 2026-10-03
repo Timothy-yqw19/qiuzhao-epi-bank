@@ -376,6 +376,10 @@ if (ZHENTI) {
   app.go("data");
   ok(viewHtml("v-data").includes("本机真题库"), "数据页统计含真题库");
   app.go("list");
+  // 运行时载入这条路（浏览器里才真正跑），做静态断言：URL、成功判定、协议守卫
+  ok(html.includes('fetch("data/zhenti.json")'), "运行时从 data/zhenti.json 载入真题");
+  ok(/r\.ok \? r\.json\(\) : null/.test(html), "仅响应成功才解析（公网 404 会静默跳过）");
+  ok(html.includes('if(!/^https?:$/.test(location.protocol)) return;'), "file:// 下不做无谓请求");
 }
 
 console.log("六、网址路由（做成网站后的地址栏行为）");
