@@ -236,7 +236,26 @@ function reindex(){
   N_FRESH= QS.filter(isFresh).length;
   N_ZHENTI=QS.filter(isZhenti).length;
 }
-/* 真题库：只在本地服务下载入（data/zhenti.json 已被 .gitignore 排除，不会上传到公网） */
+/* 真题库：只在本地载入（data/zhenti.json 已被 .gitignore 排除，不会上传到公网）
+   状态分别对应不同提示：内嵌 / 已载入 / 公网无此文件（设计如此）/ 本机 404 / file:// / 网络错误 */
+let zhentiState = (BANK.meta && BANK.meta.zhentiInlined) ? "inlined" : "unknown";
+function isLocalHost(){
+  const h=location.hostname||"";
+  return h==="localhost" || h==="127.0.0.1" || h==="::1" || h==="[::1]"
+      || /^192\.168\./.test(h) || /^10\./.test(h) || /^172\.(1[6-9]|2\d|3[01])\./.test(h);
+}
+function zhentiHint(){
+  if(N_ZHENTI) return "";
+  if(zhentiState==="public")
+    return '<span class="muted">· 公网版按版权要求不含真题库（1500 题）；想在本机刷真题，见 README「本机真题库」</span>';
+  if(zhentiState==="proto")
+    return '<div class="banner">你是用 <code>file://</code> 直接打开的，浏览器不允许这种页面读取 <code>data/zhenti.json</code>。两个办法：<b>①</b> 双击同目录下的 <code>zhenti.local.html</code>（真题已内嵌，无需起服务）；<b>②</b> 在项目目录跑 <code>bash serve.sh</code>，再用 <code>http://127.0.0.1:8788/</code> 打开。</div>';
+  if(zhentiState==="notfound")
+    return '<div class="banner">本机服务里没找到 <code>data/zhenti.json</code>（404）。检查两点：<b>①</b> 服务目录是项目根目录——用 <code>bash serve.sh</code>；<b>②</b> 文件确实存在，没有就跑 <code>python3 import_zhenti.py</code>。也可以直接双击 <code>zhenti.local.html</code>。</div>';
+  if(zhentiState==="error")
+    return '<div class="banner">读取 <code>data/zhenti.json</code> 失败（网络错误）。可直接双击 <code>zhenti.local.html</code>（真题已内嵌）。</div>';
+  return "";
+}
 function loadZhenti(list){
   zhentiQs = Array.isArray(list) ? list : [];
   reindex(); renderTabs(); refreshSubtitle();
@@ -246,11 +265,23 @@ function loadZhenti(list){
   if(N_ZHENTI) toast("已载入本机真题库 "+N_ZHENTI+" 题");
 }
 function tryLoadZhenti(){
-  if(typeof fetch !== "function") return;
-  if(!/^https?:$/.test(location.protocol)) return;     // file:// 下直接跳过
-  fetch("data/zhenti.json").then(function(r){ return r.ok ? r.json() : null; })
-    .then(function(d){ if(d && Array.isArray(d.questions) && d.questions.length) loadZhenti(d.questions); })
-    .catch(function(){ /* 公网站点没有该文件，正常情况，静默跳过 */ });
+  if(zhentiState==="inlined") return;                    // 真题已内嵌进本文件，不用再拉
+  if(typeof fetch !== "function"){ zhentiState="error"; return; }
+  if(!/^https?:$/.test(location.protocol)){              // file:// 下取不到
+    zhentiState="proto";
+    if(view==="list") renderList();
+    return;
+  }
+  fetch("data/zhenti.json").then(function(r){
+      if(!r.ok){ zhentiState = isLocalHost() ? "notfound" : "public"; return null; }
+      return r.json();
+    })
+    .then(function(d){
+      if(d && Array.isArray(d.questions) && d.questions.length){ loadZhenti(d.questions); zhentiState="loaded"; }
+      else if(zhentiState!=="public" && zhentiState!=="notfound"){ zhentiState = isLocalHost() ? "notfound" : "public"; }
+      if(view==="list") renderList();
+    })
+    .catch(function(){ zhentiState="error"; if(view==="list") renderList(); });
 }
 function refreshSubtitle(){
   const sub=document.getElementById("hdsub");
@@ -717,7 +748,7 @@ function renderList(){
    +'</div>'
    +'<div class="row" style="margin:0 0 10px"><span class="muted" id="cnt"></span>'
    +'<span class="muted">· 原题 '+N_ORIG+' 道为手写真题/仿真题；构建期生成 '+N_GEN+' 道；本机新生成 '+N_FRESH+' 道（上限 '+MAX_FRESH+'）'+(N_ZHENTI?'；真题库 '+N_ZHENTI+' 道（本机导入）':'')+'</span></div>'
-   +(N_ZHENTI?'':'<div class="banner">本机真题库未载入。它需要你本地跑一次 <code>import_zhenti.py</code>（用本地服务打开本页时才会自动载入），详见 README；因版权原因，真题数据不会随站点发布。</div>')
+   +zhentiHint()
    +'<div class="grid" id="grid"></div>';
   const rebuild=()=>{ fModule=$("#fm").value; fTopic=$("#ft").value; fSrc=$("#fs").value; fText=$("#fq").value.trim(); drawGrid(); };
   $("#fm").onchange=rebuild; $("#ft").onchange=rebuild; $("#fs").onchange=rebuild;
@@ -1046,6 +1077,7 @@ if(typeof navigator!=="undefined" && navigator.serviceWorker && /^https?:$/.test
   window.addEventListener("load",()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 }
 loadFresh();
+if(zhentiState==="inlined") zhentiQs = BASE_QS.filter(isZhenti);   // 单文件版：真题已内嵌
 reindex();
 timerInit();
 setInterval(timerTick, 1000);

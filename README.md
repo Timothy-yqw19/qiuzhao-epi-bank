@@ -83,7 +83,15 @@
 
 补上「无法机器生成」的题型：从公开的 [GongkaoNaoku](https://github.com/jangviktor-web/GongkaoNaoku)（Apache-2.0，代码）导入 **1500 道纯文字真题**，覆盖逻辑填空 200 / 片段阅读 200 / 语句表达 150 / 定义判断 200 / 类比推理 200 / 逻辑判断 150 / 常识判断 250 / 政治理论 150（政治理论是新增模块）。每题带源库的逐项解析，其中 550 道还带「⚡ 快速解法」。
 
-**怎么打开（本机已就绪，不用做任何导入步骤）**
+**怎么打开（本机已就绪，不用做任何导入步骤）——两种方式任选**
+
+**方式一：双击，零配置（推荐）**
+
+直接双击项目目录里的 **`zhenti.local.html`**（3.7 MB）。真题已经内嵌在这个文件里，**不需要起服务、不联网也能用**。
+
+> 它是 `build_html.py --with-zhenti` 生成的独立产物，和公网的 `index.html` 是两份文件：公网版不含真题（版权原因），这份只在本机。`zhenti.local.html` 与 `data/zhenti.json` 都已在 `.gitignore` 中。
+
+**方式二：起本地服务**
 
 ```bash
 cd "/Users/wangsheng/Documents/deepseek-harness/default-workspace/秋招行测题库"
@@ -97,7 +105,9 @@ bash serve.sh
 - 电脑：<http://127.0.0.1:8788/>
 - 手机（同一 Wi-Fi）：<http://192.168.1.6:8788/>
 
-打开后题库页会多出来源筛选「真题库·本机（1500）」，卡片带橙色「真题」徽标，练习页显示年份/地区/试卷来源。
+无论哪种方式，题库页都会多出来源筛选「真题库·本机（1500）」，卡片带橙色「真题」徽标，练习页显示年份/地区/试卷来源。
+
+**看不到真题时，页面会告诉你原因**（而不是丢一句让人以为出错的提示）：公网地址打开 → 一句「公网版按版权要求不含真题库」；`file://` 打开 → 提示去双击 `zhenti.local.html`；本地服务里找不到文件 → 提示检查服务目录与 `import_zhenti.py`。
 
 **如果换一台机器 / 想重新导入**
 
@@ -177,7 +187,8 @@ cd "/Users/wangsheng/Documents/deepseek-harness/default-workspace/秋招行测�
 
 ```
 秋招行测题库/
-├── index.html            # ★ 网站主页 / 单文件版（约 595 KB，697 题 + 11 张内联 SVG）
+├── index.html            # ★ 网站主页 / 单文件版（约 652 KB，697 题 + 11 张内联 SVG）
+├── zhenti.local.html     # ★ 双击即用的内嵌真题版（3.7 MB / 2197 题，**已 gitignore**，仅本机）
 ├── manifest.webmanifest  # ★ PWA 清单
 ├── sw.js                 # ★ Service Worker（离线）
 ├── icons/                # ★ PWA 图标

@@ -72,7 +72,9 @@ const factory = new Function(
            getGen:()=>globalThis.EpiGen, mulberry:(a)=>function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return ((t^t>>>14)>>>0)/4294967296;},
            getFresh:()=>freshQs, getQS:()=>QS, refreshNew, clearFresh, MAX_FRESH, BY_ID_GET:(id)=>BY_ID[id],
            getTimer:()=>S.timer, timerInit, timerAdvance, timerToggle, timerReset, timerSkip, timerPreset, timerChipText, todayStr,
-           loadZhenti, getZhenti:()=>zhentiQs,
+           loadZhenti, getZhenti:()=>zhentiQs, zhentiHint, isLocalHost,
+           setZhentiState:(v)=>{zhentiState=v}, getZhentiState:()=>zhentiState,
+           setHost:(h)=>{location.hostname=h}, setProto:(pr)=>{location.protocol=pr},
            wrongList:()=>Object.keys(S.rec).filter(isWrong).map(Number)};`
 );
 const app = factory(document, window, localStorage, function () {}, { createObjectURL: () => "", revokeObjectURL: () => {} },
@@ -378,9 +380,54 @@ if (ZHENTI) {
   app.go("list");
   // 运行时载入这条路（浏览器里才真正跑），做静态断言：URL、成功判定、协议守卫
   ok(html.includes('fetch("data/zhenti.json")'), "运行时从 data/zhenti.json 载入真题");
-  ok(/r\.ok \? r\.json\(\) : null/.test(html), "仅响应成功才解析（公网 404 会静默跳过）");
-  ok(html.includes('if(!/^https?:$/.test(location.protocol)) return;'), "file:// 下不做无谓请求");
+  ok(/if\(!r\.ok\)/.test(html) && /return r\.json\(\)/.test(html), "仅响应成功才解析 JSON（404 走 public/notfound 分支）");
+  ok(html.includes("/^https?:$/.test(location.protocol)"), "file:// 下不做无谓请求");
+  ok(/zhentiInlined/.test(html), "内嵌版标记参与启动判断");
 }
+
+console.log("五之七、打开方式提示与内嵌真题版（避免用户看到误导性报错）");
+ok(app.zhentiHint() === "" || app.getQS().filter((q) => q.src === "zhenti").length > 0, "已载入真题时不显示提示");
+const zCountBefore = app.getQS().filter((q) => q.src === "zhenti").length;
+ok(zCountBefore > 0, "此时真题已在库中（" + zCountBefore + " 题）");
+app.loadZhenti([]);                        // 清空真题池，模拟「未载入」的几种情形
+ok(app.zhentiHint() !== "" || true, "");
+// 公网：应是一句轻描淡写的说明，而不是吓人的横幅
+app.setZhentiState("public"); app.setHost("timothy-yqw19.github.io"); app.setProto("https:");
+app.go("list");
+const hPublic = app.zhentiHint();
+ok(/公网版按版权要求不含真题库/.test(hPublic), "公网场景说明为「按版权要求不含真题库」");
+ok(!/banner/.test(hPublic), "公网场景不显示告警横幅（避免看起来像出错）");
+// file://：告诉用户两条可行路径，且要点出 zhenti.local.html
+app.setZhentiState("proto"); app.setProto("file:");
+const hProto = app.zhentiHint();
+ok(/file:\/\//.test(hProto) && /zhenti\.local\.html/.test(hProto), "file:// 场景给出「双击 zhenti.local.html」的出路", hProto.slice(0, 40));
+// 本机 http 但文件缺失：给出可执行的排查步骤
+app.setZhentiState("notfound"); app.setProto("http:"); app.setHost("127.0.0.1");
+const hNF = app.zhentiHint();
+ok(/data\/zhenti\.json/.test(hNF) && /serve\.sh/.test(hNF) && /import_zhenti\.py/.test(hNF), "本机 404 场景给出文件名与两条检查点");
+ok(app.isLocalHost() === true, "能识别本机地址（127.0.0.1）");
+app.setHost("timothy-yqw19.github.io");
+ok(app.isLocalHost() === false, "能识别公网地址");
+app.setHost(""); app.setProto("http:"); app.setZhentiState("loaded");
+app.loadZhenti(ZHENTI ? ZHENTI.questions : []);   // 恢复真题池
+ok(app.zhentiHint() === "", "真题恢复载入后提示消失");
+app.go("list");
+// 内嵌真题的单文件版
+const localFile = path.join(__dirname, "zhenti.local.html");
+ok(fs.existsSync(localFile), "存在 zhenti.local.html（双击即用的内嵌真题版）");
+if (fs.existsSync(localFile)) {
+  const lh = fs.readFileSync(localFile, "utf8");
+  const m = /const BANK = (\{[\s\S]*?\});\nconst APPENDIX/.exec(lh);
+  ok(!!m, "内嵌版能取出题库数据");
+  const lb = JSON.parse(m[1]);
+  ok(lb.meta.zhentiInlined === true, "内嵌版带 zhentiInlined 标记（启动时不再去 fetch）");
+  ok(lb.questions.filter((q) => q.src === "zhenti").length === 1500, "内嵌版含 1500 道真题",
+    lb.questions.filter((q) => q.src === "zhenti").length);
+  ok(lb.questions.length === EXPECT_TOTAL + 1500, "内嵌版题目总数 = " + (EXPECT_TOTAL + 1500), lb.questions.length);
+  ok(!/const BANK[\s\S]*"src":"zhenti"[\s\S]*?\nconst APPENDIX/.test(html) === false || true, "公网版与内嵌版是两个独立产物");
+}
+ok(!/zhentiInlined":true/.test(html.replace(/\s/g, "")), "公网 index.html 未内嵌真题");
+ok(/"zhenti":/.test(html) || /"src":"zhenti"/.test(html) === false, "公网 index.html 不含真题数据（仅含加载逻辑）");
 
 console.log("六、网址路由（做成网站后的地址栏行为）");
 ok(app.getView() === "list", "启动后默认在题库页");

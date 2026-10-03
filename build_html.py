@@ -8,6 +8,7 @@
 """
 
 import json
+import sys
 import os
 import re
 
@@ -17,6 +18,8 @@ GEN = os.path.join(HERE, "data", "generated.json")
 TPL = os.path.join(HERE, "app_template.html")
 GENJS = os.path.join(HERE, "app_gen.js")
 OUT = os.path.join(HERE, "index.html")
+ZHENTI = os.path.join(HERE, "data", "zhenti.json")
+OUT_ZHENTI = os.path.join(HERE, "zhenti.local.html")   # 内嵌真题的单文件版（已 gitignore，仅本机）
 
 
 def md_inline(s):
@@ -105,9 +108,18 @@ def main():
     ids = [q["id"] for q in orig + gen]
     assert len(set(ids)) == len(ids), "题号冲突：原题与生成题 id 重叠"
 
+    with_zhenti = "--with-zhenti" in sys.argv
+    zhenti = []
+    if with_zhenti:
+        if not os.path.exists(ZHENTI):
+            raise SystemExit("要内嵌真题请先跑 import_zhenti.py 生成 data/zhenti.json")
+        with open(ZHENTI, encoding="utf-8") as f:
+            zhenti = json.load(f)["questions"]
+
     bank = {"meta": dict(data["meta"], origCount=len(orig), genCount=len(gen),
-                         count=len(orig) + len(gen)),
-            "questions": orig + gen}
+                         zhentiCount=len(zhenti), zhentiInlined=bool(zhenti),
+                         count=len(orig) + len(gen) + len(zhenti)),
+            "questions": orig + gen + zhenti}
     appendix = {k: md_block(v) for k, v in data["appendix"].items()}
 
     with open(GENJS, encoding="utf-8") as f:
@@ -117,13 +129,18 @@ def main():
     html = html.replace("/*__APPENDIX__*/", js_json(appendix))
     html = html.replace("/*__GEN__*/", genjs)
 
-    with open(OUT, "w", encoding="utf-8") as f:
+    target = OUT_ZHENTI if with_zhenti else OUT
+    with open(target, "w", encoding="utf-8") as f:
         f.write(html)
 
-    size = os.path.getsize(OUT)
-    print("已生成 %s（%.1f KB，共 %d 题 = 原题 %d + 生成 %d，配图 %d 张）" % (
-        OUT, size / 1024, len(orig) + len(gen), len(orig), len(gen),
-        sum(1 for q in orig + gen if q.get("svg"))))
+    size = os.path.getsize(target)
+    if with_zhenti:
+        print("已生成 %s（%.1f MB，共 %d 题 = 原题 %d + 生成 %d + 真题 %d）—— 双击即可，无需起服务"
+              % (OUT_ZHENTI, size / 1048576, len(orig) + len(gen) + len(zhenti), len(orig), len(gen), len(zhenti)))
+    else:
+        print("已生成 %s（%.1f KB，共 %d 题 = 原题 %d + 生成 %d，配图 %d 张）" % (
+            OUT, size / 1024, len(orig) + len(gen), len(orig), len(gen),
+            sum(1 for q in orig + gen if q.get("svg"))))
     return 0
 
 

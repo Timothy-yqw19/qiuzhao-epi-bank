@@ -8,3 +8,4 @@ __pycache__/
 # 真题库仅供本机个人学习（版权归原平台，不得再分发）
 data/zhenti.json
 .db_tmp/
+zhenti.local.html
