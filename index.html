@@ -823,11 +823,13 @@ const MAX_FRESH = 300;                 // 本机新生成题的保留上限（�
 const isOrig  = q => !q.src || q.src==="orig";
 const isBuilt = q => q.src==="gen";
 const isFresh = q => q.src==="fresh";
+const isZhenti = q => q.src==="zhenti";
 const isGen   = q => isBuilt(q) || isFresh(q);   // 「程序生成」的统称
 
 let freshQs = [], freshSeq = 900000;
+let zhentiQs = [];                                // 本机导入的真题（公网站点载入不到，会自动跳过）
 let QS = [], BY_ID = {}, MODULES = [], TOPICS = [];
-let N_ORIG = 0, N_GEN = 0, N_FRESH = 0;
+let N_ORIG = 0, N_GEN = 0, N_FRESH = 0, N_ZHENTI = 0;
 
 function loadFresh(){
   try{
@@ -839,13 +841,19 @@ function saveFresh(){
   try{ localStorage.setItem(FRESH_KEY, JSON.stringify({seq:freshSeq, list:freshQs})); }catch(e){ console.warn("新题保存失败", e); }
 }
 function pruneFresh(){
+  const gone = {};
   while(freshQs.length > MAX_FRESH){
     const old = freshQs.shift();
+    gone[old.id] = 1;
     if(S && S.rec && S.rec[old.id]) delete S.rec[old.id];   // 连带清掉记录，避免错题本指向已删除的题
+  }
+  if(Object.keys(gone).length){
+    queue = queue.filter(id=>!gone[id]);                    // 同步收缩当前练习队列
+    if(idx >= queue.length) idx = Math.max(0, queue.length-1);
   }
 }
 function reindex(){
-  QS = BASE_QS.concat(freshQs);
+  QS = BASE_QS.concat(freshQs, zhentiQs);
   BY_ID = {}; QS.forEach(q=>{ BY_ID[q.id]=q; });
   MODULES = []; TOPICS = [];
   QS.forEach(q=>{ if(!MODULES.includes(q.module)) MODULES.push(q.module);
@@ -853,10 +861,34 @@ function reindex(){
   N_ORIG = QS.filter(isOrig).length;
   N_GEN  = QS.filter(isBuilt).length;
   N_FRESH= QS.filter(isFresh).length;
+  N_ZHENTI=QS.filter(isZhenti).length;
+}
+/* 真题库：只在本地服务下载入（data/zhenti.json 已被 .gitignore 排除，不会上传到公网） */
+function loadZhenti(list){
+  zhentiQs = Array.isArray(list) ? list : [];
+  reindex(); renderTabs(); refreshSubtitle();
+  if(view==="list") renderList();
+  if(view==="practice") renderPractice();
+  if(view==="data") renderData();
+  if(N_ZHENTI) toast("已载入本机真题库 "+N_ZHENTI+" 题");
+}
+function tryLoadZhenti(){
+  if(typeof fetch !== "function") return;
+  if(!/^https?:$/.test(location.protocol)) return;     // file:// 下直接跳过
+  fetch("data/zhenti.json").then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(d){ if(d && Array.isArray(d.questions) && d.questions.length) loadZhenti(d.questions); })
+    .catch(function(){ /* 公网站点没有该文件，正常情况，静默跳过 */ });
+}
+function refreshSubtitle(){
+  const sub=document.getElementById("hdsub");
+  if(sub) sub.textContent="银行 EPI · 原题 "+N_ORIG+" + 生成 "+N_GEN
+    +(N_ZHENTI?" + 真题 "+N_ZHENTI:"")+(N_FRESH?" + 新题 "+N_FRESH:"")+" · 离线可用";
 }
 function clearFresh(){
-  freshQs.forEach(q=>{ if(S.rec[q.id]) delete S.rec[q.id]; });
+  const gone = {};
+  freshQs.forEach(q=>{ gone[q.id]=1; if(S.rec[q.id]) delete S.rec[q.id]; });
   freshQs = []; saveFresh(); reindex(); save();
+  queue = queue.filter(id=>!gone[id]); if(idx >= queue.length) idx = Math.max(0, queue.length-1);
 }
 
 /* ---------------- 存储 ---------------- */
@@ -950,7 +982,7 @@ function timerAdvance(ms, silent){
   save();
 }
 function timerChipText(){
-  const T=S.timer; if(!T) return "⏱ --:--";
+  const T=S.timer; if(!T) return "⏱ --:--";   // 页面刚加载时的兜底
   return (T.mode==="focus"?"🍅 ":"☕ ")+fmtMS(T.remainingMs);
 }
 function timerNotify(){
@@ -986,6 +1018,7 @@ function timerPreset(min, brk){
   toast("已设为专注 "+min+" 分钟 / 休息 "+brk+" 分钟");
 }
 function renderTimer(){
+  if(!S.timer) timerInit();
   const T=S.timer, total=(T.mode==="focus"?T.focusMin:T.breakMin)*60000;
   const pct=Math.max(0,Math.min(100,100*(1-T.remainingMs/total)));
   const presets=[[15,3],[25,5],[45,10],[60,10]];
@@ -1147,6 +1180,9 @@ function cur(){ return BY_ID[queue[idx]]; }
 
 function renderPractice(){
   const box=$("#v-practice");
+  // 题目池可能变小（清空/裁剪本机新题），先剔除已失效的题号，避免练习页读到 undefined
+  queue = queue.filter(id=>BY_ID[id]);
+  if(idx >= queue.length) idx = Math.max(0, queue.length-1);
   if(!queue.length){
     box.innerHTML='<div class="card"><h2>练习</h2><p class="muted">还没选题目。去「题库」筛一组，或到「刷题计划」点某天的「开始」。</p>'
       +'<div class="row" style="margin-top:10px">'
@@ -1190,6 +1226,7 @@ function renderPractice(){
    +'<div class="qbody">'
    +(q.materialHtml?'<div class="material"><div class="mtitle">'+esc(q.materialTitle)+'　<span class="chip" id="matToggle" style="cursor:pointer">收起材料</span></div><div id="matBody">'+q.materialHtml+'</div></div>':'')
    +(q.svg?'<div class="fig">'+q.svg+'</div>':'')
+   +(isZhenti(q)&&(q.origin||q.paper)?'<div class="muted" style="margin:-6px 0 10px">来源：'+esc([q.origin,q.paper].filter(Boolean).join(" · "))+'</div>':'')
    +'<div class="stem">'+mdEsc(q.stem)+'</div>'
    +'<div class="opts">'+q.options.map(o=>'<button class="'+optCls(o)+'" data-k="'+o.k+'"><span class="k">'+o.k+'</span><span>'+esc(o.t)+'</span></button>').join("")+'</div>'
    +(showVerdict?'<div class="verdict '+(picked===q.answer?"ok":"bad")+'">'+(picked===q.answer?"✓ 答对了":"✗ 答错了，正确答案是 "+q.answer)+'　<span class="muted">（本题累计作答 '+r.tries+' 次，错 '+r.wrong+' 次）</span></div>':'')
@@ -1199,7 +1236,7 @@ function renderPractice(){
    +'<button class="btn" id="anaBtn">'+(showAna?"收起逐步解析":"看逐步解析")+'</button>'
    +(examMode?'<button class="btn primary" id="submitBtn">交卷看本组结果</button>':'')
    +'</div>'
-   +(showTip?'<div class="box tip"><span class="lab">标准思路 · 技巧</span>'+mdEsc(q.tip)+'</div>':'')
+   +(showTip&&q.tip?'<div class="box tip"><span class="lab">标准思路 · 技巧</span>'+mdEsc(q.tip)+'</div>':'')
    +(showAna?'<div class="box ana"><span class="lab">逐步解析</span>'+(q.analysis?mdEsc(q.analysis):'<span class="muted">原文未给逐步解析（常识模块只给了技巧与答案）。可在此处补上你自己的推理链。</span>')+'</div>':'')
    +(q.sectionTip?'<div class="box ana"><span class="lab">题型通用破题顺序</span>'+mdEsc(q.sectionTip)+'</div>':'')
    +'<div class="note-wrap"><div class="lab">我的思路笔记'
@@ -1293,6 +1330,7 @@ let fModule="", fTopic="", fState="", fText="", fSrc="";
 function renderList(){
   const modes=[["","全部"],["none","未做"],["bad","做错的"],["fav","收藏"],["doubt","存疑"],["note","有笔记"],["ana","无解析"]];
   const srcs=[["","全部来源"],["orig","仅原题（"+N_ORIG+"）"],["gen","构建期生成（"+N_GEN+"）"],["fresh","本机新生成（"+N_FRESH+"）"]];
+  if(N_ZHENTI) srcs.push(["zhenti","真题库·本机（"+N_ZHENTI+"）"]);
   $("#v-list").innerHTML='<div class="card">'
    +'<div class="row">'
    +'<select id="fm"><option value="">全部模块</option>'+MODULES.map(m=>'<option '+(fModule===m?"selected":"")+'>'+esc(m)+'</option>').join("")+'</select>'
@@ -1305,7 +1343,8 @@ function renderList(){
    +'<div class="row" style="margin-top:10px">'+modes.map(([k,t])=>'<button class="btn '+(fState===k?"on":"")+'" data-st="'+k+'">'+t+'</button>').join("")+'</div>'
    +'</div>'
    +'<div class="row" style="margin:0 0 10px"><span class="muted" id="cnt"></span>'
-   +'<span class="muted">· 原题 '+N_ORIG+' 道为手写真题/仿真题；构建期生成 '+N_GEN+' 道；本机新生成 '+N_FRESH+' 道（可在「刷题计划」页一键刷新，上限 '+MAX_FRESH+' 题）</span></div>'
+   +'<span class="muted">· 原题 '+N_ORIG+' 道为手写真题/仿真题；构建期生成 '+N_GEN+' 道；本机新生成 '+N_FRESH+' 道（上限 '+MAX_FRESH+'）'+(N_ZHENTI?'；真题库 '+N_ZHENTI+' 道（本机导入）':'')+'</span></div>'
+   +(N_ZHENTI?'':'<div class="banner">本机真题库未载入。它需要你本地跑一次 <code>import_zhenti.py</code>（用本地服务打开本页时才会自动载入），详见 README；因版权原因，真题数据不会随站点发布。</div>')
    +'<div class="grid" id="grid"></div>';
   const rebuild=()=>{ fModule=$("#fm").value; fTopic=$("#ft").value; fSrc=$("#fs").value; fText=$("#fq").value.trim(); drawGrid(); };
   $("#fm").onchange=rebuild; $("#ft").onchange=rebuild; $("#fs").onchange=rebuild;
@@ -1321,6 +1360,7 @@ function filtered(){
     if(fSrc==="orig" && !isOrig(q)) return false;
     if(fSrc==="gen" && !isBuilt(q)) return false;
     if(fSrc==="fresh" && !isFresh(q)) return false;
+    if(fSrc==="zhenti" && !isZhenti(q)) return false;
     if(fText && !(q.stem+" "+q.options.map(o=>o.t).join(" ")+" "+q.tip).includes(fText)) return false;
     const r=S.rec[q.id]||{};
     if(fState==="none" && r.picked) return false;
@@ -1340,7 +1380,7 @@ function drawGrid(){
     const dot=st==="ok"?'<span class="dot ok"></span>':st==="bad"?'<span class="dot bad"></span>':'<span class="dot"></span>';
     return '<div class="qcard" data-id="'+q.id+'">'
       +'<div class="top">'+dot+'<span class="no">'+q.id+'</span><span class="chip">'+esc(q.topic)+'</span>'
-      +(isFresh(q)?'<span class="chip ok">新生成</span>':isBuilt(q)?'<span class="chip acc">生成</span>':'')
+      +(isZhenti(q)?'<span class="chip warn">真题</span>':isFresh(q)?'<span class="chip ok">新生成</span>':isBuilt(q)?'<span class="chip acc">生成</span>':'')
       +(q.svg?'<span class="chip">图</span>':'')+(q.analysis?'':'<span class="chip warn">无解析</span>')
       +(r.fav?'<span class="chip ok">★</span>':'')+(r.doubt?'<span class="chip warn">?</span>':'')+'</div>'
       +'<div class="stem">'+esc(stemText(q))+'</div>'
@@ -1561,6 +1601,7 @@ function renderData(){
    +'<div class="stat"><b>'+acc(doneOrig)+'</b><span>原题正确率（'+doneOrig.length+'/'+N_ORIG+'）</span></div>'
    +'<div class="stat"><b>'+acc(doneGen)+'</b><span>生成题正确率（'+doneGen.length+'/'+(N_GEN+N_FRESH)+'）</span></div>'
    +'<div class="stat"><b>'+N_FRESH+'</b><span>本机刷新题（上限 '+MAX_FRESH+'）</span></div>'
+   +'<div class="stat"><b>'+N_ZHENTI+'</b><span>本机真题库</span></div>'
    +'<div class="stat"><b>'+fmtDur((S.timer&&S.timer.todayMs)||0)+'</b><span>今日专注时长</span></div>'
    +'<div class="stat"><b>'+fmtDur((S.timer&&S.timer.totalMs)||0)+'</b><span>累计专注时长</span></div>'
    +'</div></div>'
@@ -1604,7 +1645,7 @@ function renderData(){
   $("#clrNote").onclick=()=>{ if(!confirm("清空所有笔记？建议先导出。")) return;
     Object.keys(S.rec).forEach(id=>S.rec[id].note=""); save(true); renderData(); renderTabs(); toast("已清空笔记"); };
   $("#clrAll").onclick=()=>{ if(!confirm("全部重置（进度、错题、笔记、计划勾选）？此操作不可撤销。")) return;
-    S=blank(); save(true); renderData(); renderTabs(); toast("已重置"); };
+    S=blank(); timerInit(); save(true); renderData(); renderTabs(); toast("已重置"); };
 }
 
 /* ---------------- 键盘 ---------------- */
@@ -1636,8 +1677,8 @@ reindex();
 timerInit();
 setInterval(timerTick, 1000);
 document.title="秋招行测题库 · 银行 EPI "+QS.length+" 题";
-const _sub=document.getElementById("hdsub");
-if(_sub) _sub.textContent="银行 EPI · 原题 "+N_ORIG+" + 生成 "+N_GEN+(N_FRESH?" + 新题 "+N_FRESH:"")+" · 离线可用";
+refreshSubtitle();
+tryLoadZhenti();
 renderTabs();
 if(location.hash) applyRoute(); else go("list");
 </script>

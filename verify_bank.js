@@ -12,6 +12,8 @@ const html = fs.readFileSync(file, "utf8");
 const genData = JSON.parse(fs.readFileSync(path.join(__dirname, "data", "generated.json"), "utf8"));
 const EXPECT_GEN = genData.questions.length, EXPECT_TOTAL = 134 + EXPECT_GEN;
 const N_GEN_STUB = EXPECT_GEN;
+const zhentiPath = path.join(__dirname, "data", "zhenti.json");
+const ZHENTI = fs.existsSync(zhentiPath) ? JSON.parse(fs.readFileSync(zhentiPath, "utf8")) : null;
 
 /* ---------- 取出应用脚本 ---------- */
 const blocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
@@ -70,6 +72,7 @@ const factory = new Function(
            getGen:()=>globalThis.EpiGen, mulberry:(a)=>function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return ((t^t>>>14)>>>0)/4294967296;},
            getFresh:()=>freshQs, getQS:()=>QS, refreshNew, clearFresh, MAX_FRESH, BY_ID_GET:(id)=>BY_ID[id],
            getTimer:()=>S.timer, timerInit, timerAdvance, timerToggle, timerReset, timerSkip, timerPreset, timerChipText, todayStr,
+           loadZhenti, getZhenti:()=>zhentiQs,
            wrongList:()=>Object.keys(S.rec).filter(isWrong).map(Number)};`
 );
 const app = factory(document, window, localStorage, function () {}, { createObjectURL: () => "", revokeObjectURL: () => {} },
@@ -343,6 +346,38 @@ ok(app.getTimer().running === true, "补算后仍在计时状态");
 app.timerReset();
 app.go("list");
 
+console.log("五之六、本机真题库（仅本地导入，不进公开站点）");
+ok(!!ZHENTI, "存在 data/zhenti.json（本地导入的真题）");
+if (ZHENTI) {
+  ok(ZHENTI.questions.length === 1500, "真题 1500 题", ZHENTI.questions.length);
+  ok(/仅供个人学习/.test(ZHENTI.meta.licenseNote), "数据自带版权/使用范围说明", ZHENTI.meta.licenseNote.slice(0, 24));
+  const beforeZ = app.getQS().length;
+  app.loadZhenti(ZHENTI.questions);
+  ok(app.getQS().length === beforeZ + 1500, "全库扩到 " + app.getQS().length + " 题");
+  const Z = app.getQS().filter((q) => q.src === "zhenti");
+  ok(Z.length === 1500, "真题池已并入题库", Z.length);
+  ok(Z.every((q) => q.options.length === 4 && new Set(q.options.map((o) => o.t)).size === 4), "真题每题 4 个不重复选项");
+  ok(Z.every((q) => q.options.some((o) => o.k === q.answer)), "真题答案都在选项中");
+  ok(Z.every((q) => q.analysis && q.analysis.length > 10), "真题都带解析");
+  ok(Z.every((q) => q.id >= 300001), "真题号段独立（300001 起，不与原题/生成题冲突）");
+  ok(new Set(app.getQS().map((q) => q.id)).size === app.getQS().length, "并入后题号仍全局唯一");
+  const zt = {}; Z.forEach((q) => { zt[q.topic] = (zt[q.topic] || 0) + 1; });
+  ok(Object.keys(zt).length === 8, "覆盖 8 个题型（正是无法机器生成的那几类）", zt);
+  ok(Z.some((q) => q.topic === "政治理论"), "带来新模块：政治理论");
+  ok(app.selIds({ k: "t", t: "逻辑填空" }).length >= 200, "可按题型单独刷真题", app.selIds({ k: "t", t: "逻辑填空" }).length);
+  ok(app.selIds({ k: "all", orig: true }).length === 134, "21 天计划仍只跑手写原题（不被真题稀释）", app.selIds({ k: "all", orig: true }).length);
+  app.go("list");
+  ok(count(viewHtml("grid"), /class="qcard"/g) === app.getQS().length, "题库页渲染含真题的全部题卡", count(viewHtml("grid"), /class="qcard"/g));
+  ok(viewHtml("grid").includes("真题"), "真题卡片带「真题」徽标");
+  app.go("practice");
+  app.jump(300001);
+  ok(viewHtml("v-practice").includes("来源："), "练习页显示真题的年份/地区/试卷来源");
+  ok(!viewHtml("v-practice").includes("undefined"), "真题练习页无 undefined");
+  app.go("data");
+  ok(viewHtml("v-data").includes("本机真题库"), "数据页统计含真题库");
+  app.go("list");
+}
+
 console.log("六、网址路由（做成网站后的地址栏行为）");
 ok(app.getView() === "list", "启动后默认在题库页");
 ok(location.hash === "#/list", "启动后地址栏为 #/list", location.hash);
@@ -356,7 +391,7 @@ location.hash = "#/practice/42"; fireHash();
 ok(app.getView() === "practice" && app.getCur() && app.getCur().id === 42, "深链接 #/practice/42 打开第 42 题",
   app.getCur() && app.getCur().id);
 ok(location.hash === "#/practice/42", "深链接地址保持不变", location.hash);
-ok(app.getQueue().length === EXPECT_TOTAL, "深链接后仍可上下翻题", app.getQueue().length);
+ok(app.getQueue().length === app.getQS().length, "深链接后仍可上下翻题（队列=全库）", app.getQueue().length);
 location.hash = "#/nonsense"; fireHash();
 ok(app.getView() === "list", "无效地址回退到题库页");
 app.go("data");

@@ -104,7 +104,7 @@ self.addEventListener("fetch", (e) => {
   if (req.mode === "navigate" || (req.headers.get("accept") || "").includes("text/html")) {
     e.respondWith(
       fetch(req)
-        .then((res) => { caches.open(V).then((c) => c.put(req, res.clone())); return res; })
+        .then((res) => { if (res.ok) caches.open(V).then((c) => c.put(req, res.clone())); return res; })
         .catch(() => caches.match("./index.html"))
     );
     return;
@@ -113,7 +113,7 @@ self.addEventListener("fetch", (e) => {
   // 其余资源走「缓存优先」
   e.respondWith(
     caches.match(req).then((hit) =>
-      hit || fetch(req).then((res) => { caches.open(V).then((c) => c.put(req, res.clone())); return res; })
+      hit || fetch(req).then((res) => { if (res.ok) caches.open(V).then((c) => c.put(req, res.clone())); return res; })
     )
   );
 });

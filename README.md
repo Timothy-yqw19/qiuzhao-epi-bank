@@ -23,7 +23,7 @@
 
 | 页面 | 作用 |
 |---|---|
-| 题库 | 按模块 / 题型 / **来源（原题·生成题）** / 状态（未做、做错、收藏、存疑、有笔记、无解析）筛选，题干关键词搜索 |
+| 题库 | 按模块 / 题型 / **来源（原题·构建期生成·本机新生成·本机真题库）** / 状态（未做、做错、收藏、存疑、有笔记、无解析）筛选，题干关键词搜索 |
 | 练习 | 单题作答；**练习模式**点选即判并给标准思路，**考试模式**交卷后统一公布；每题带本题计时、收藏、存疑 |
 | 错题本 | 自动收集答错的题，保留错误次数，可一键重练，可导出 Markdown / CSV |
 | 我的思路 | 汇总你写的全部解题笔记，可就地编辑、搜索、导出 Markdown |
@@ -45,7 +45,7 @@
 | 资料分析 | 文字/表格/增速材料，一组 4 问 | 从材料原始数字重新推导（基期、增长量、比重、人均、排序） |
 | 翻译推理 | 只有…才… / 如果…那么… / 除非…否则… / 三段论 | 按逻辑等价式构造，正确答案唯一 |
 
-刷新出的题存在本机浏览器里（上限 300 题，超出自动丢最早的，并连带清理其答题记录），在「题库」页可用来源筛选「本机新生成」单独看，也可以在「数据」页一键清空。**言语理解、图形推理、定义判断、类比推理、常识这五类无法机器生成**，仍只有手写题。
+刷新出的题存在本机浏览器里（上限 300 题，超出自动丢最早的，并连带清理其答题记录），在「题库」页可用来源筛选「本机新生成」单独看，也可以在「数据」页一键清空。**言语理解、图形推理、定义判断、类比推理、常识这五类无法机器生成**，见下节用真题库补足。
 
 ## 题库构成
 
@@ -69,6 +69,30 @@
 | 逻辑判断 | 80 | 翻译推理（只有…才…、如果…那么…、除非…否则…）与三段论 | 按逻辑等价式构造，正确答案唯一 |
 
 每题都带：题干 + 4 个选项 + **标准思路（技巧）** + 逐步解析 + 答案。11 张图形推理配图（SVG）已内联进 HTML。
+
+## 本机真题库（默认不随站点发布，重要）
+
+补上「无法机器生成」的题型：从公开的 [GongkaoNaoku](https://github.com/jangviktor-web/GongkaoNaoku)（Apache-2.0，代码）导入 **1500 道纯文字真题**，覆盖逻辑填空 200 / 片段阅读 200 / 语句表达 150 / 定义判断 200 / 类比推理 200 / 逻辑判断 150 / 常识判断 250 / 政治理论 150（政治理论是新增模块）。每题带源库的逐项解析，其中 550 道还带「⚡ 快速解法」。
+
+**怎么用**
+
+```bash
+git clone https://gitee.com/jangviktor/GongkaoNaoku.git   # 国内速度更快；或 GitHub 同名仓库
+cd GongkaoNaoku && python3 assemble_db.py                 # 合并分卷，得到 kaogong.db（约 148 MB）
+cd /path/to/秋招行测题库
+$PY import_zhenti.py --db /path/to/GongkaoNaoku/kaogong.db  # 产出 data/zhenti.json
+# 然后用本地服务打开本站（不是 file://），真题库会自动载入
+python3 -m http.server 8788 --bind 127.0.0.1 --directory .
+```
+
+载入后：题库页多一个来源筛选项「真题库·本机」，卡片带橙色「真题」徽标，练习页显示年份/地区/试卷来源；手机走局域网地址也能刷到真题。
+
+**为什么它不随站点发布**
+
+- GongkaoNaoku 的 Apache-2.0 **只覆盖它的代码**；它 README 的免责声明明确写着：「真题、选项、材料、配图版权归原作者及原题库平台，**仅供个人学习使用**」。
+- 它的上游 [ERRRC/xingcezhenti](https://github.com/ERRRC/xingcezhenti)（737 stars）**没有提供任何许可证**（默认保留所有权利）。
+- 因此 `data/zhenti.json` 已列入 `.gitignore`，**只在本机使用**；公开仓库与 GitHub Pages 站点都不含真题数据。公网站点打开时该文件不存在，应用会静默跳过（题库页会提示「本机真题库未载入」）。
+- 导入脚本 `import_zhenti.py` 本身是我的代码，可以公开；它只做格式转换，筛选条件也写得很清楚（纯文字、单选、无材料引用、无存疑标注、选项四个且答案唯一、`is_answer` 与 `answer` 交叉一致）。
 
 ## 已知边界（重要）
 
@@ -107,7 +131,7 @@ $PY build_bank.py               # 源 md + figs/ → data/questions.json（134 �
 $PY gen_quant.py                # 出题器 → data/generated.json（563 道生成题，自带反算自检）
 $PY build_html.py               # 合并两者 + app_template.html → index.html
 $PY build_site.py               # 生成站点文件到根目录（manifest、sw.js、图标、.nojekyll）
-$NODE verify_bank.js            # 167 项校验（数据 / 计划 / 生成题 / 一键刷新 / 计时器 / 全流程 / 富文本转义 / 路由 / 站点打包）
+$NODE verify_bank.js            # 186 项校验（数据 / 计划 / 生成题 / 一键刷新 / 计时器 / 真题库 / 全流程 / 富文本转义 / 路由 / 站点打包）
 ```
 
 - `build_bank.py`、`gen_quant.py` 都只读源文件，不改动原题库。
@@ -129,13 +153,15 @@ $NODE verify_bank.js            # 167 项校验（数据 / 计划 / 生成题 / 
 ├── build_bank.py         # 源题库 md → 结构化 JSON
 ├── gen_quant.py          # 构建期出题器（Python，内含逐题反算自检）
 ├── app_gen.js            # 浏览器内出题器（一键刷新新题用，构建时内联进 index.html）
+├── import_zhenti.py      # 从 GongkaoNaoku 的 SQLite 题库导入真题（产出 data/zhenti.json，已 gitignore）
 ├── build_html.py         # 合并 + 生成 index.html
 ├── build_site.py         # 生成站点文件到根目录（PWA 图标、manifest、Service Worker）
-├── verify_bank.js        # 167 项校验
+├── verify_bank.js        # 186 项校验
 ├── parse_report.txt      # 原题解析告警报告
 ├── data/
 │   ├── questions.json    # 134 道手写原题
-│   └── generated.json    # 563 道生成题
+│   ├── generated.json    # 563 道生成题
+│   └── zhenti.json       # 1500 道真题（**已被 .gitignore 排除**，仅本机）
 └── source/               # 源文档快照（md + 11 张 SVG），用于可复现重建
 ```
 
