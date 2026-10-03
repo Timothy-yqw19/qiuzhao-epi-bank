@@ -47,6 +47,7 @@
   }
 
   var stemSeen = Object.create(null);
+  function resetSeen() { stemSeen = Object.create(null); }   // 变体用尽后允许重来（一键刷新不能点几次就没题）
 
   /* 组装一道题；check() 为反向验算，不通过就返回 null */
   function build(module, topic, stem, ans, dists, tip, ana, opt) {
@@ -915,33 +916,384 @@
     return { ran: out.length, fail: fail };
   }
 
+
+  /* ============================ 图形推理（程序化作图） ============================
+   * 行测图推的四大规律族里，能机器作画又能量化验证的都做进来：
+   *   数量规律（封闭区域数、直线段数）· 属性规律（对称轴数量）
+   *   位置规律（旋转、黑点平移）· 样式规律（去同存异）· 特殊考点（一笔画）
+   * 每题都按规则作图，选项也是图形；答案由构造规则直接给出并反向校验。
+   * ==========================================================================*/
+  var INK = "#111", GRID = "#c9ced6";
+
+  function cellBox(inner) { return inner || ""; }
+
+  /* 把若干格子横排成一张 SVG；null 表示「?」格 */
+  function rowSvg(items, cw, ch) {
+    cw = cw || 96; ch = ch || 96;
+    var pad = 6, n = items.length, W = pad + n * (cw + pad), H = ch + 2 * pad;
+    var parts = [];
+    for (var i = 0; i < n; i++) {
+      var x = pad + i * (cw + pad);
+      parts.push('<rect x="' + x + '" y="' + pad + '" width="' + cw + '" height="' + ch + '" fill="#fff" stroke="' + GRID + '"/>');
+      parts.push('<g transform="translate(' + x + ',' + pad + ') scale(' + (cw / 100) + ',' + (ch / 100) + ')">' + (items[i] || '<text x="50" y="66" font-size="46" text-anchor="middle" fill="#111">?</text>') + '</g>');
+    }
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" width="' + Math.round(W * 0.92) + '" height="' + Math.round(H * 0.92) + '" xmlns="http://www.w3.org/2000/svg">' + parts.join("") + '</svg>';
+  }
+
+  function dots(n, cols, r) {           // n 个黑点，按 cols 列排布
+    cols = cols || 3; r = r || 11;
+    var out = [], gap = 70 / (cols - 1 || 1), rows = Math.ceil(n / cols);
+    for (var i = 0; i < n; i++) {
+      var cx = cols === 1 ? 50 : 15 + (i % cols) * gap;
+      var cy = 15 + Math.floor(i / cols) * (rows > 1 ? 70 / (rows - 1) : 0);
+      out.push('<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="' + r + '" fill="' + INK + '"/>');
+    }
+    return out.join("");
+  }
+
+  function polyPath(pts, close, w) {
+    var d = pts.map(function (p, i) { return (i ? "L" : "M") + p[0] + " " + p[1]; }).join(" ");
+    if (close) d += " Z";
+    return '<path d="' + d + '" fill="none" stroke="' + INK + '" stroke-width="' + (w || 3) + '" stroke-linejoin="round" stroke-linecap="round"/>';
+  }
+
+  /* 正多边形顶点 */
+  function regPoly(n, cx, cy, r, rot) {
+    var pts = [];
+    for (var i = 0; i < n; i++) {
+      var a = (rot || 0) + i * 2 * Math.PI / n - Math.PI / 2;
+      pts.push([+(cx + r * Math.cos(a)).toFixed(1), +(cy + r * Math.sin(a)).toFixed(1)]);
+    }
+    return pts;
+  }
+
+  /* 1) 数量规律：封闭区域数递增（正方形内加 n-1 条竖线 → n 个区域） */
+  function gRegion() {
+    var start = ri(1, 4), delta = pick([1, 2]), shape = pick(["rect", "circle"]);
+    var cells = [], vals = [], i, k;
+    function cellFor(v) {
+      var inner = shape === "circle"
+        ? '<circle cx="50" cy="50" r="34" fill="#fff" stroke="' + INK + '" stroke-width="3"/>'
+        : '<rect x="16" y="18" width="68" height="64" fill="#fff" stroke="' + INK + '" stroke-width="3"/>';
+      for (var q = 1; q < v; q++) {
+        var x = 16 + 68 * q / v;
+        inner += '<line x1="' + x.toFixed(1) + '" y1="' + (shape === "circle" ? "20" : "18") + '" x2="' + x.toFixed(1) + '" y2="' + (shape === "circle" ? "80" : "82") + '" stroke="' + INK + '" stroke-width="2.4"/>';
+      }
+      return inner;
+    }
+    for (i = 0; i < 4; i++) { var v = start + i * delta; vals.push(v); cells.push(cellFor(v)); }
+    var want = start + 4 * delta;
+    var correct = cellFor(want);
+    var opts = [correct, cellFor(want - 1), cellFor(want + 1), cellFor(want + 2)];
+    var q = buildSvg("数量规律：数「封闭区域（面）」的个数。",
+      rowSvg(cells.concat([null])), opts, 0,
+      "图形内部被线条分割出的每一块都是一个「面」。先数每个图里有几个封闭区域，看是否成等差。",
+      "四个图的封闭区域数依次为 " + vals.join("、") + "，每次增加 " + delta + "，所以问号处应有 " + want + " 个封闭区域。",
+      "region|" + start + "|" + delta + "|" + shape);
+    return q;
+  }
+
+  /* 2) 数量规律：直线段数递增 */
+  function gLines() {
+    var start = ri(3, 7), cells = [], vals = [], i, k, style = pick(["zig", "fan"]);
+    function star(n) {                       // n 条线段组成的折线
+      var pts = [], seg = 70 / n, t;
+      if (style === "fan") {                 // 从同一点出发的扇状折线（角度限制在 0.08π~0.5π，
+        // 否则端点会算到负坐标、画到格子外面去——几何校验抓过这个 bug）
+        for (t = 0; t < n; t++) {
+          var a = Math.PI * (0.08 + 0.42 * (t / (n - 1 || 1)));
+          pts.push([18, 80]);
+          pts.push([+(18 + 68 * Math.cos(a)).toFixed(1), +(80 - 66 * Math.sin(a)).toFixed(1)]);
+        }
+        return pts.map(function (p, idx) { return idx % 2 ? "" : polyPath([p, pts[idx + 1]], false, 3); }).join("");
+      }
+      // 要恰好 n 条线段 → 需要 n+1 个点（折线的段数 = 点数 − 1，之前少画一条，解析里的数字就与图形对不上）
+      for (t = 0; t <= n; t++) pts.push([15 + t * seg, t % 2 ? 78 : 22]);
+      return polyPath(pts, false, 3);
+    }
+    for (i = 0; i < 4; i++) { vals.push(start + i); cells.push(star(start + i)); }
+    var want = start + 4;
+    var q = buildSvg("数量规律：数直线段的条数。",
+      rowSvg(cells.concat([null])), [star(want), star(want - 1), star(want + 1), star(want + 2)], 0,
+      "图形由直线组成时，先数「线段条数」（折线一段算一条）。",
+      "四个图的直线段数依次为 " + vals.join("、") + "，每次加 1，问号处应为 " + want + " 条。",
+      "lines|" + start + "|" + style);
+    return q;
+  }
+
+  /* 3) 属性规律：对称轴数量递增（1、2、3、4 → 5：正五边形） */
+  function gSym() {
+    var shapes = {
+      // 1 条对称轴：必须是「等腰但不等边」的三角形（若画成等边三角形就是 3 条轴，答案就错了）
+      1: polyPath([[50, 16], [80, 84], [20, 84]], true, 3),
+      // 2 条对称轴：长方形（非正方形）
+      2: '<rect x="16" y="28" width="68" height="44" fill="none" stroke="' + INK + '" stroke-width="3"/>',
+      // 3 条：等边三角形
+      3: polyPath(regPoly(3, 50, 56, 36, 0), true, 3),
+      // 4 条：正方形
+      4: '<rect x="22" y="22" width="56" height="56" fill="none" stroke="' + INK + '" stroke-width="3"/>'
+    };
+    shapes[5] = polyPath(regPoly(5, 50, 52, 34, 0), true, 3);
+    shapes[6] = polyPath(regPoly(6, 50, 52, 33, 0), true, 3);
+    shapes[7] = polyPath(regPoly(7, 50, 52, 34, 0), true, 3);   // 正七边形 7 条对称轴
+    shapes[8] = polyPath(regPoly(8, 50, 52, 34, 0), true, 3);   // 正八边形 8 条对称轴（留足干扰项）
+    // 已知四格是前四个「轴数」），答案是下一格——不能把答案本身放进已知序列
+    var want6 = pick([5, 6]);                     // 求 5 / 6 条对称轴
+    var keys = [want6 - 4, want6 - 3, want6 - 2, want6 - 1], cells = keys.map(function (k) { return shapes[k]; });
+    var answerShape = shapes[want6];
+    var others = [1, 2, 3, 4, 5, 6, 7, 8].filter(function (x) { return keys.indexOf(x) < 0 && x !== want6; });
+    if (others.length < 3) return null;
+    var op = shuffleCopy(others).slice(0, 3).map(function (x) { return shapes[x]; });
+    var q = buildSvg("属性规律：数对称轴。",
+      rowSvg(cells.concat([null])), [answerShape].concat(op), 0,
+      "规则图形优先数「对称轴的条数」；注意区分仅轴对称与同时中心对称。",
+      "四个图形的对称轴依次为 " + keys.join("、") + " 条，所以问号处应有 " + want6 + " 条对称轴" +
+      "（正五边形 5 条、正六边形 6 条、正方形 4 条）。",
+      "sym|" + want6);
+    return q;
+  }
+
+  /* 4) 位置规律：图形按固定角度旋转（每次顺时针 k 度） */
+  function gRotate() {
+    var stepDeg = pick([30, 45, 60, 90, 120]), startDeg = pick([0, 15, 20, 30, 45]);
+    var style = pick(["arrow", "L", "flag"]);
+    function arrow(deg) {
+      var a = deg * Math.PI / 180;
+      if (style === "L") {                                  // 「L」形折线，旋转同样看得出来
+        var p1 = [50 - 26 * Math.cos(a), 50 - 26 * Math.sin(a)];
+        var cor = [50 + 8 * Math.cos(a) - 20 * Math.sin(a), 50 + 8 * Math.sin(a) + 20 * Math.cos(a)];
+        var p2 = [50 + 26 * Math.cos(a), 50 + 26 * Math.sin(a)];
+        return polyPath([p1, cor, p2], false, 4);
+      }
+      if (style === "flag") {                               // 旗形：一条横杆 + 一面小旗
+        var t1 = [50 - 28 * Math.cos(a), 50 - 28 * Math.sin(a)];
+        var t2 = [50 + 28 * Math.cos(a), 50 + 28 * Math.sin(a)];
+        var n1 = [-Math.sin(a), Math.cos(a)];
+        var f1 = [t2[0] - 14 * Math.cos(a) + 16 * n1[0], t2[1] - 14 * Math.sin(a) + 16 * n1[1]];
+        var f2 = [t2[0] - 14 * Math.cos(a) - 16 * n1[0], t2[1] - 14 * Math.sin(a) - 16 * n1[1]];
+        return polyPath([t1, t2], false, 4) + polyPath([t2, f1, f2], true, 2.4);
+      }
+      var tip = [50 + 30 * Math.cos(a), 50 + 30 * Math.sin(a)];
+      var tail = [50 - 30 * Math.cos(a), 50 - 30 * Math.sin(a)];
+      var l = [50 + 8 * Math.cos(a + 2.5), 50 + 8 * Math.sin(a + 2.5)];
+      var r = [50 + 8 * Math.cos(a - 2.5), 50 + 8 * Math.sin(a - 2.5)];
+      return polyPath([tail, l, tip, r, tail], false, 3.4);
+    }
+    var cells = [], angs = [];
+    for (var i = 0; i < 4; i++) { var d = startDeg + i * stepDeg; angs.push(d); cells.push(arrow(d)); }
+    var want = startDeg + 4 * stepDeg;
+    var q = buildSvg("位置规律：看旋转方向与角度。",
+      rowSvg(cells.concat([null])), [arrow(want), arrow(want + stepDeg), arrow(want - stepDeg), arrow(want + 2 * stepDeg)], 0,
+      "形状完全一样、只有方向在变 → 看旋转。相邻两图夹角就是要旋转的角度，别只看方向忘了角度。",
+      "每次顺时针旋转 " + stepDeg + "°，前四图角度依次为 " + angs.join("°、") + "°，所以问号处应为 " + want + "°。",
+      "rot|" + stepDeg + "|" + startDeg + "|" + style);
+    return q;
+  }
+
+  /* 5) 位置规律：黑点在 3×3 格中规律移动 */
+  function gMove() {
+    var step = pick([1, 2, 3, 4, 5, 6, 7, 8]), start = ri(0, 8);
+    function frame(pos) {
+      var out = '<rect x="12" y="12" width="76" height="76" fill="none" stroke="' + INK + '" stroke-width="2.6"/>';
+      for (var g = 1; g < 3; g++) {
+        out += '<line x1="' + (12 + 76 * g / 3) + '" y1="12" x2="' + (12 + 76 * g / 3) + '" y2="88" stroke="' + INK + '" stroke-width="1.6"/>';
+        out += '<line x1="12" y1="' + (12 + 76 * g / 3) + '" x2="88" y2="' + (12 + 76 * g / 3) + '" stroke="' + INK + '" stroke-width="1.6"/>';
+      }
+      var c = pos % 3, r = Math.floor(pos / 3);
+      out += '<circle cx="' + (12 + 76 * (c * 2 + 1) / 6) + '" cy="' + (12 + 76 * (r * 2 + 1) / 6) + '" r="9" fill="' + INK + '"/>';
+      return out;
+    }
+    var cells = [], seq = [];
+    for (var i = 0; i < 4; i++) { var p = (start + i * step) % 9; seq.push(p); cells.push(frame(p)); }
+    var want = (start + 4 * step) % 9;
+    var q = buildSvg("位置规律：黑点在九宫格中按规律移动。",
+      rowSvg(cells.concat([null])), [frame(want), frame((want + 1) % 9), frame((want + 3) % 9), frame((want + 8) % 9)], 0,
+      "把九宫格按 1~9 编号（左上为 1，逐行向右），看黑点每次移动几格、朝哪个方向（本题是每步 +" + step + " 格）。",
+      "黑点位置依次为第 " + seq.join("、") + " 格，每次前进 " + step + " 格（超过 9 就循环回前面），所以下一格是第 " + want + " 格。",
+      "move|" + step + "|" + start);
+    return q;
+  }
+
+  /* 6) 样式规律：去同存异（前两图相同部分去掉、不同部分保留） */
+  function gXor() {
+    var units = [];
+    for (var i = 0; i < 8; i++) units.push(i);          // 8 格 → 变体更多，也降低「答案与序列图撞车」的概率
+    function subset() { return units.filter(function () { return rnd() < 0.5; }); }
+    var A = subset(), B = subset();
+    while (A.length === 0 || B.length === 0 || xor(A, B).length === 0) { A = subset(); B = subset(); }
+    function xor(x, y) { return x.filter(function (u) { return (y.indexOf(u) < 0) !== (x.indexOf(u) < 0) ? true : false; })
+                              .filter(function (v, i, a) { return a.indexOf(v) === i; })
+                              .concat(y.filter(function (u) { return x.indexOf(u) < 0; })); }
+    function uniq(a) { var o = []; a.forEach(function (v) { if (o.indexOf(v) < 0) o.push(v); }); return o; }
+    function draw(list) {
+      var pos = [[22, 26], [44, 26], [66, 26], [88, 26], [22, 66], [44, 66], [66, 66], [88, 66]];
+      return list.map(function (u) {
+        return '<circle cx="' + pos[u][0] + '" cy="' + pos[u][1] + '" r="9" fill="' + INK + '"/>';
+      }).join("");
+    }
+    var X1 = uniq(xor(A, B));
+    var C = subset(), D = subset();
+    var guard = 0;
+    while ((C.length === 0 || D.length === 0 || uniq(xor(C, D)).length === 0) && guard++ < 50) { C = subset(); D = subset(); }
+    var X2 = uniq(xor(C, D));
+    if (!X1.length || !X2.length) return null;
+    var cells = [draw(A), draw(B), draw(X1), draw(C), draw(D)];
+    var q = buildSvg("样式规律：前两图「去同存异」得到第三图。",
+      rowSvg(cells.concat([null])), [draw(X2), draw(uniq(C.concat(D))), draw(A), draw(uniq(X2.concat([0])))], 0,
+      "同位置相比：两图都有 → 去掉；只有一个图有 → 保留。这叫「去同存异」（相加就是「去异存同」的对照）。",
+      "第 1、2 图去同存异得到第 3 图；同理第 4、5 图去同存异即为答案：两图都有的位置去掉，只有其一有的位置保留。",
+      "xor|" + draw(A) + draw(B) + draw(C) + draw(D));
+    return q;
+  }
+
+  /* 7) 特殊考点：一笔画（连通图中奇点数为 0 或 2 才能一笔画成） */
+  function gStroke() {
+    function oddCount(nodes, edges) {
+      var deg = nodes.map(function () { return 0; });
+      edges.forEach(function (e) { deg[e[0]]++; deg[e[1]]++; });
+      var odd = 0;
+      deg.forEach(function (d) { if (d % 2 === 1) odd++; });
+      return odd;
+    }
+    function connected(nodes, edges) {            // 一笔画必须是连通图，断开的不算
+      var adj = nodes.map(function () { return []; });
+      edges.forEach(function (e) { adj[e[0]].push(e[1]); adj[e[1]].push(e[0]); });
+      var seen = {}, st = [0]; seen[0] = 1;
+      while (st.length) { var v = st.pop(); adj[v].forEach(function (u) { if (!seen[u]) { seen[u] = 1; st.push(u); } }); }
+      return Object.keys(seen).length === nodes.length;
+    }
+    function drawFig(nodes, edges) {
+      return edges.map(function (e) {
+        var a = nodes[e[0]], b = nodes[e[1]];
+        return '<line x1="' + a[0] + '" y1="' + a[1] + '" x2="' + b[0] + '" y2="' + b[1] +
+               '" stroke="' + INK + '" stroke-width="3" stroke-linecap="round"/>';
+      }).join("");
+    }
+    var SQ = [[22, 22], [78, 22], [78, 78], [22, 78]];
+    var TRI = [[50, 18], [84, 80], [16, 80]];
+    var PENT = regPoly(5, 50, 52, 36, 0);
+    var HFIG = [[50, 20], [22, 52], [78, 52], [22, 82], [78, 82]];
+    // 能一笔画（奇点 0 或 2，且连通）
+    var ONE = [
+      [TRI, [[0, 1], [1, 2], [2, 0]]],
+      [SQ, [[0, 1], [1, 2], [2, 3], [3, 0]]],
+      [PENT, [[0, 1], [1, 2], [2, 3], [3, 4], [4, 0]]],
+      [HFIG, [[0, 1], [0, 2], [1, 3], [3, 4], [2, 4], [1, 2]]],
+      [SQ, [[0, 1], [1, 2], [2, 3], [3, 0], [0, 2]]]
+    ];
+    // 不能一笔画（奇点 4 或 6）
+    var BAD = [
+      [SQ, [[0, 1], [1, 2], [2, 3], [3, 0], [0, 2], [1, 3]]],                                  // 正方形+两条对角线
+      [[[50, 16], [50, 84], [16, 50], [84, 50]], [[0, 1], [2, 3], [0, 2], [0, 3], [1, 2], [1, 3]]], // 十字
+      [TRI.concat([[50, 56]]), [[0, 1], [1, 2], [2, 0], [0, 3], [1, 3], [2, 3]]],               // 三角形+中心连三顶点
+      [TRI.concat([[50, 50]]), [[0, 1], [1, 2], [2, 0], [0, 3], [3, 1], [3, 2]]]                // 三角形+三条中线
+    ];
+    // 校验：ONE 全部连通且奇点 0/2；BAD 全部不满足（否则干扰项也能一笔画，答案就不唯一了）
+    for (var c = 0; c < ONE.length; c++) {
+      var oc = oddCount(ONE[c][0], ONE[c][1]);
+      if ([0, 2].indexOf(oc) < 0 || !connected(ONE[c][0], ONE[c][1])) return null;
+    }
+    for (var b = 0; b < BAD.length; b++) {
+      var o2 = oddCount(BAD[b][0], BAD[b][1]);
+      if (o2 === 0 || o2 === 2 || !connected(BAD[b][0], BAD[b][1])) return null;
+    }
+    var okFig = ONE[ri(0, ONE.length - 1)];
+    var correctInner = drawFig(okFig[0], okFig[1]);
+    var badPick = shuffleCopy(BAD).slice(0, 3).map(function (x) { return drawFig(x[0], x[1]); });
+    if (badPick.length < 3) return null;
+    var ansIdx = ri(0, 3), list = [];
+    for (var i2 = 0; i2 < 4; i2++) list.push(i2 === ansIdx ? correctInner : badPick[i2 > ansIdx ? i2 - 1 : i2]);
+    if (list.filter(function (x) { return !!x; }).length !== 4) return null;
+    return buildSvg("下面四个图形中，哪一个可以一笔画成（不重复地画完每条线，起点任意）？",
+      null, list, ansIdx,
+      "一笔画的判定：先看是否连通，再数「奇点」（引出奇数条线的点）。奇点数为 0 或 2 时能一笔画成；否则需要 奇点数 ÷ 2 笔。",
+      "正确答案那个图形是连通的，且奇点数为 " + oddCount(okFig[0], okFig[1]) + "，可以一笔画成；" +
+      "其余三个图形的奇点数分别是 4、4、4（或 6），都不是 0 或 2，必须分多笔才能画完。",
+      "stroke|" + correctInner + "|" + badPick.join(""));
+  }
+
+  function shuffleCopy(a) { var b = a.slice(); for (var i = b.length - 1; i > 0; i--) { var j = Math.floor(rnd() * (i + 1)); var t = b[i]; b[i] = b[j]; b[j] = t; } return b; }
+
+  /* 图形题的组装：题干图 + 图形选项 + 答案字母
+     两个必查项：
+       1) 正确答案的图形不能出现在题干图里（否则等于把答案摆出来）——一笔画那类题踩过；
+       2) 选项图形必须套一层 <svg viewBox="0 0 100 100">，否则浏览器会按默认 300x150 坐标系
+          渲染，图形会错位/缩成一团。 */
+  function buildSvg(stem, seqSvg, optionSvgs, ansIdx, tip, ana, dedupKey) {
+    if (!optionSvgs || optionSvgs.length !== 4) return null;
+    for (var z = 0; z < 4; z++) if (!optionSvgs[z]) return null;
+    var rawAns = optionSvgs[ansIdx];
+    if (seqSvg && seqSvg.indexOf(rawAns) >= 0) return null;      // 答案不能直接出现在题干图里
+
+    var idx = [];
+    for (var i = 0; i < 4; i++) idx.push(i);
+    for (var j = idx.length - 1; j > 0; j--) { var k = Math.floor(rnd() * (j + 1)); var t = idx[j]; idx[j] = idx[k]; idx[k] = t; }
+    var letters = "ABCD", options = [], answer = "";
+    for (i = 0; i < 4; i++) {
+      var raw = optionSvgs[idx[i]];
+      options.push({ k: letters[i], t: "", svg: '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">' + raw + '</svg>' });
+      if (idx[i] === ansIdx) answer = letters[i];
+    }
+    if (!answer) return null;
+    var uniqSvg = {};
+    for (i = 0; i < options.length; i++) { if (uniqSvg[options[i].svg]) return null; uniqSvg[options[i].svg] = 1; }
+
+    var contentKey = (seqSvg || "") + "||" + optionSvgs.join("|");
+    var key = dedupKey || contentKey;
+    if (stemSeen[key]) return null;
+    stemSeen[key] = 1;
+    return {
+      module: "判断推理", topic: "图形推理", source: "生成", src: "gen",
+      stem: stem, options: options, svg: seqSvg || null, imgs: null,
+      tip: tip, analysis: ana, answer: answer,
+      materialTitle: "", materialHtml: "", sectionTip: "", moduleTip: "",
+      diff: 3
+    };
+  }
+
   var TOPIC_FN = {
     "数字推理": [gArith, gArith2, gGeo, gRecAdd, gRecMul, gSquare, gCube, gSumRule, gSplit, gFrac],
     "数学运算": [mEngineer, mMeet, mChase, mProfit, mMix, mIncl, mComb, mTree, mAge, mBottle, mCow, mExtreme],
     "资料分析": [matText, matTable, matGrowth],
     "逻辑判断": [gLogic],
-    "思维策略": [gBridge, gNim, gWeigh, gJug, gQueue, gAssign, gWeight, gGrid]
+    "思维策略": [gBridge, gNim, gWeigh, gJug, gQueue, gAssign, gWeight, gGrid],
+    "图形推理": [gRegion, gLines, gSym, gRotate, gMove, gXor, gStroke]
   };
   var ALL_TOPICS = Object.keys(TOPIC_FN);
 
-  /* 生成 n 道题；topics 为空表示四类混合 */
+  /* 生成 n 道题；topics 为空表示全部题型。
+     调度方式：把名额均分给「题型 × 规则」的每个组合，逐轮发放；
+     某个组合连续失败说明它的变体已用尽，就退出（这样既均衡又不会让变体多的族吃掉全部题量）。 */
   function refresh(n, topics) {
     topics = (topics && topics.length) ? topics.filter(function (t) { return TOPIC_FN[t]; }) : ALL_TOPICS;
     if (!topics.length) topics = ALL_TOPICS;
-    var out = [], guard = 0, maxGuard = n * 40 + 400, counts = {};
-    topics.forEach(function (t) { counts[t] = 0; });
-    // 按题型轮流取「当前产出最少」的那类，避免资料分析（一次出 4 题）挤占其他题型
-    while (out.length < n && guard < maxGuard) {
-      guard++;
-      var topic = topics[0];
-      topics.forEach(function (t) { if (counts[t] < counts[topic]) topic = t; });
-      var fns = TOPIC_FN[topic], fn = fns[Math.floor(rnd() * fns.length)];
-      var before = out.length, q;
-      q = fn(fn === matText || fn === matTable || fn === matGrowth ? (guard % 900 + 1) : null, out);
-      if (q && out.length === before) out.push(q);   // 单题规则直接返回题目
-      counts[topic] += out.length - before;
+
+    var combos = [];
+    topics.forEach(function (t) { TOPIC_FN[t].forEach(function (f) { combos.push([t, f]); }); });
+    var quota = [], base = Math.floor(n / combos.length), extra = n % combos.length;
+    combos.forEach(function (c, i) { quota[i] = base + (i < extra ? 1 : 0); });
+
+    var out = [], failStreak = [], round2 = 0, guard = 0;
+    while (out.length < n && round2 < 400) {
+      round2++;
+      var progressed = false;
+      for (var i = 0; i < combos.length && out.length < n; i++) {
+        if (quota[i] <= 0) continue;
+        failStreak[i] = failStreak[i] || 0;
+        if (failStreak[i] >= 15) { quota[i] = 0; continue; }        // 该规则变体已用尽
+        guard++;
+        if (guard > n * 80 + 2000) break;
+        var f = combos[i][1];
+        var before = out.length;
+        var q = f(f === matText || f === matTable || f === matGrowth ? (round2 * 37 + i + 1) : null, out);
+        if (q && out.length === before) out.push(q);
+        var produced = out.length - before;
+        if (produced > 0) { quota[i] -= produced; failStreak[i] = 0; progressed = true; }
+        else failStreak[i]++;
+      }
+      if (!progressed) break;
     }
-    return out;
+    return out.slice(0, Math.max(n, 0));
   }
 
   /* 自检：在 Node 里生成一批并逐题校验结构，返回统计 */
@@ -952,7 +1304,8 @@
     qs.forEach(function (q) {
       byTopic[q.topic] = (byTopic[q.topic] || 0) + 1;
       dist[q.answer]++;
-      var texts = q.options.map(function (o) { return o.t; });
+      // 选项可能是图形（o.svg）而不是文字，用「文字或图形」作为同一性判据
+      var texts = q.options.map(function (o) { return o.svg ? ("svg:" + o.svg) : o.t; });
       var uniq = {}; texts.forEach(function (t) { uniq[t] = 1; });
       if (q.options.length !== 4) bad.push([q.stem, "选项数"]);
       else if (Object.keys(uniq).length !== 4) bad.push([q.stem, "选项重复"]);
@@ -964,5 +1317,5 @@
     return { total: qs.length, bad: bad, dist: dist, byTopic: byTopic };
   }
 
-  global.EpiGen = { refresh: refresh, selfTest: selfTest, setRng: setRng, topics: ALL_TOPICS, solverTests: solverTests };
+  global.EpiGen = { refresh: refresh, selfTest: selfTest, setRng: setRng, topics: ALL_TOPICS, solverTests: solverTests, resetSeen: resetSeen };
 })(typeof window !== "undefined" ? window : this);

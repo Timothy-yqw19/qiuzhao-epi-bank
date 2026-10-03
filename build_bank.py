@@ -310,6 +310,14 @@ def parse():
         i += 1
 
     questions.sort(key=lambda q: q["id"])
+
+    # 手写那批里，图形推理是最基础的一档（只有 11 道、每题一个规律）；
+    # 标成「易」以便在难度筛选里和程序作图/真题区分开，别让人以为整库图推就这水平。
+    for q in questions:
+        if q["topic"] == "图形推理":
+            q["diff"] = 1
+        else:
+            q.setdefault("diff", 0)
     return questions, warns
 
 

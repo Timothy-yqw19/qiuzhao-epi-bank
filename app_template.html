@@ -101,12 +101,23 @@ button.btn:disabled{opacity:.45;cursor:not-allowed}
 .md-table th{background:#f2f4f7;font-weight:600}
 .fig{margin:6px 0 14px;text-align:center}
 .fig svg{max-width:100%;height:auto}
-.fig img{max-width:100%;height:auto;border-radius:8px;background:#fff}
+.fig img{max-width:100%;height:auto;border-radius:8px;background:#fff;cursor:zoom-in}
+.fig svg{cursor:zoom-in}
+.figcap{text-align:center;font-size:12.5px;color:var(--ink3);margin:-4px 0 10px}
+#lightbox{position:fixed;inset:0;background:rgba(15,18,22,.93);z-index:9999;display:none;align-items:center;justify-content:center;padding:16px;overflow:auto}
+#lightbox.on{display:flex}
+#lightbox .lb-inner{background:#fff;border-radius:10px;padding:12px;overflow:auto;max-width:100%;max-height:100%}
+#lightbox img{max-width:none;display:block;background:#fff}
+#lightbox svg{max-width:none;display:block}
+#lightbox .lb-tip{position:fixed;left:0;right:0;bottom:12px;text-align:center;color:#cbd3de;font-size:12.5px;pointer-events:none}
+#lightbox .lb-close{position:fixed;right:14px;top:12px;background:#2b3240;color:#fff;border:0;border-radius:8px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
 #rushTimer{font-weight:700}
 #rushTimer.hot{color:var(--bad)}
 .stem{font-size:16px;line-height:1.85;white-space:pre-wrap;margin-bottom:14px}
 .stem strong{color:var(--ink);background:linear-gradient(transparent 62%,#ffe9a8 62%)}
 .opts{display:flex;flex-direction:column;gap:8px}
+.optsvg{display:inline-block;width:84px;height:84px;vertical-align:middle}
+.optsvg svg{width:100%;height:100%;display:block}
 .opt{
   display:flex;gap:10px;align-items:flex-start;text-align:left;font:inherit;font-size:15px;cursor:pointer;
   background:#fff;border:1px solid var(--line);border-radius:11px;padding:10px 13px;width:100%;line-height:1.6;
@@ -497,10 +508,43 @@ function timerTick(){                     // 每秒调用；用墙钟差值，�
   }
 }
 
+/* ---------------- 配图放大（图形推理的选项图形在图上，必须能放大看） ---------------- */
+function openLightbox(srcOrNode){
+  let lb=document.getElementById("lightbox");
+  if(!lb){
+    lb=document.createElement("div"); lb.id="lightbox";
+    lb.innerHTML='<div class="lb-inner"></div><button class="lb-close">关闭 ✕</button><div class="lb-tip">点击空白处或按 Esc 关闭 · 图大可滚动查看</div>';
+    document.body.appendChild(lb);
+    lb.addEventListener("click",function(e){
+      if(e.target===lb || e.target.classList.contains("lb-close")) closeLightbox();
+    });
+  }
+  const inner=lb.querySelector(".lb-inner");
+  inner.innerHTML="";
+  if(typeof srcOrNode==="string"){
+    const im=document.createElement("img"); im.src=srcOrNode; im.alt="题目配图（放大）"; inner.appendChild(im);
+  } else if(srcOrNode){
+    inner.appendChild(srcOrNode.cloneNode(true));
+  }
+  lb.classList.add("on");
+}
+function closeLightbox(){ const lb=document.getElementById("lightbox"); if(lb) lb.classList.remove("on"); }
+document.addEventListener("click",function(e){
+  const t=e.target; if(!t) return;
+  if(t.tagName==="IMG" && t.closest && t.closest(".fig")){ openLightbox(t.getAttribute("src")); return; }
+  const fig=t.closest && t.closest(".fig");
+  if(fig && t.tagName!=="IMG" && fig.querySelector("svg")){ openLightbox(fig.querySelector("svg")); }
+});
+document.addEventListener("keydown",function(e){ if(e.key==="Escape") closeLightbox(); });
+
 /* ---------------- 一键刷新新题 ---------------- */
 function refreshNew(n, topic){
   if(typeof EpiGen === "undefined"){ toast("出题器未加载"); return; }
-  const made = EpiGen.refresh(n, topic ? [topic] : null);
+  let made = EpiGen.refresh(n, topic ? [topic] : null);
+  if(made.length < n){                       // 变体用尽时允许重来，保证「刷新」按钮永远有产出
+    EpiGen.resetSeen();
+    made = made.concat(EpiGen.refresh(n - made.length, topic ? [topic] : null));
+  }
   if(!made.length){ toast("这次没生成出题，再点一次试试"); return; }
   made.forEach(q=>{ q.id = ++freshSeq; });
   freshQs = freshQs.concat(made);
@@ -665,10 +709,12 @@ function renderPractice(){
    +'<div class="qbody">'
    +(q.materialHtml?'<div class="material"><div class="mtitle">'+esc(q.materialTitle)+'　<span class="chip" id="matToggle" style="cursor:pointer">收起材料</span></div><div id="matBody">'+q.materialHtml+'</div></div>':'')
    +(q.svg?'<div class="fig">'+q.svg+'</div>':'')
-   +((q.imgs&&q.imgs.length)?'<div class="fig">'+q.imgs.map(function(src){return '<img src="'+esc(src)+'" alt="题目配图">';}).join("")+'</div>':'')
+   +((q.imgs&&q.imgs.length)?'<div class="fig">'+q.imgs.map(function(src){return '<img src="'+esc(src)+'" alt="题目配图">';}).join("")+'</div>'
+      +'<div class="figcap">'+(q.imgs.length>1?'共 '+q.imgs.length+' 张配图 · ':'')+'点击图片可放大</div>':'')
+   +((q.imgs&&q.imgs.length&&q.options.every(function(o){return o.t.trim().length<=2;}))?'<div class="muted" style="margin:-6px 0 12px">A–D 四个<b>选项的图形</b>就在上方配图里（<b>点图放大</b>看清再选）</div>':'')
    +(isZhenti(q)&&(q.origin||q.paper)?'<div class="muted" style="margin:-6px 0 10px">来源：'+esc([q.origin,q.paper].filter(Boolean).join(" · "))+'</div>':'')
    +'<div class="stem">'+mdEsc(q.stem)+'</div>'
-   +'<div class="opts">'+q.options.map(o=>'<button class="'+optCls(o)+'" data-k="'+o.k+'"><span class="k">'+o.k+'</span><span>'+esc(o.t)+'</span></button>').join("")+'</div>'
+   +'<div class="opts">'+q.options.map(o=>'<button class="'+optCls(o)+'" data-k="'+o.k+'"><span class="k">'+o.k+'</span><span>'+(o.svg?'<span class="optsvg">'+o.svg+'</span>':esc(o.t))+'</span></button>').join("")+'</div>'
    +(showVerdict?'<div class="verdict '+(picked===q.answer?"ok":"bad")+'">'+(picked===q.answer?"✓ 答对了":"✗ 答错了，正确答案是 "+q.answer)+'　<span class="muted">（本题累计作答 '+r.tries+' 次，错 '+r.wrong+' 次）</span></div>':'')
    +(examMode&&picked?'<div class="verdict muted" style="color:#8b94a3">已选 '+picked+'，考试模式下交卷后统一公布答案。</div>':'')
    +'<div class="reveal">'

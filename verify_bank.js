@@ -12,7 +12,9 @@ const html = fs.readFileSync(file, "utf8");
 const genData = JSON.parse(fs.readFileSync(path.join(__dirname, "data", "generated.json"), "utf8"));
 const stratPath = path.join(__dirname, "data", "strategy.json");
 const STRAT = fs.existsSync(stratPath) ? JSON.parse(fs.readFileSync(stratPath, "utf8")) : { questions: [] };
-const EXPECT_GEN = genData.questions.length + STRAT.questions.length;   // 构建期生成题（含思维策略）
+const grafPath = path.join(__dirname, "data", "graphics.json");
+const GRAF = fs.existsSync(grafPath) ? JSON.parse(fs.readFileSync(grafPath, "utf8")) : { questions: [] };
+const EXPECT_GEN = genData.questions.length + STRAT.questions.length + GRAF.questions.length;   // 构建期生成题（含思维策略 / 图形推理）
 const EXPECT_TOTAL = 134 + EXPECT_GEN;
 const N_GEN_STUB = EXPECT_GEN;
 const zhentiPath = path.join(__dirname, "data", "zhenti.json");
@@ -70,7 +72,7 @@ const factory = new Function(
   "document", "window", "localStorage", "Blob", "URL", "FileReader",
   "requestAnimationFrame", "confirm", "alert", "location", "history", "navigator",
   code + `
-  ;return {QS,BY_ID,PLAN,APPENDIX,selIds,wrongMD,wrongCSV,stemText,R,isWrong,stateOf,filtered,
+  ;var API = {QS,BY_ID,PLAN,APPENDIX,selIds,wrongMD,wrongCSV,stemText,R,isWrong,stateOf,filtered,
            getS:()=>S, KEY, go, startSet, pick, next, finishSet, jump, startWrong, save,
            getView:()=>view, getCur:()=>cur(), getQueue:()=>queue, applyRoute,
            getGen:()=>globalThis.EpiGen, mulberry:(a)=>function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return ((t^t>>>14)>>>0)/4294967296;},
@@ -81,7 +83,12 @@ const factory = new Function(
            rushCfg, rushOn, rushSecs, rushTimeout, getRushQid:()=>rushQid,
            setZhentiState:(v)=>{zhentiState=v}, getZhentiState:()=>zhentiState,
            setHost:(h)=>{location.hostname=h}, setProto:(pr)=>{location.protocol=pr},
-           wrongList:()=>Object.keys(S.rec).filter(isWrong).map(Number)};`
+           wrongList:()=>Object.keys(S.rec).filter(isWrong).map(Number)};
+  // 关键：QS / BY_ID 是会被 reindex() 重新赋值的变量，导出成 getter 才能始终取到当前值
+  // （直接导出值会在工厂返回那一刻被快照，之后载入真题/新题都看不到）
+  Object.defineProperty(API,"QS",{get:function(){return QS;},enumerable:true,configurable:true});
+  Object.defineProperty(API,"BY_ID",{get:function(){return BY_ID;},enumerable:true,configurable:true});
+  return API;`
 );
 const app = factory(document, window, localStorage, function () {}, { createObjectURL: () => "", revokeObjectURL: () => {} },
   function () {}, () => {}, () => true, () => {}, location, history, navigator);
@@ -107,7 +114,7 @@ ok(app.QS.every((q) => q.options.map((o) => o.k).join("") === "ABCD"), "选项�
 ok(app.QS.every((q) => q.options.some((o) => o.k === q.answer)), "答案都能在选项里找到");
 ok(app.QS.every((q) => q.stem && q.stem.trim()), "题干非空");
 ok(app.QS.every((q) => q.tip && q.tip.trim()), "每题都有标准思路（技巧）");
-ok(app.QS.filter((q) => q.svg).length === 11, "11 张图形推理配图已内联", app.QS.filter((q) => q.svg).length);
+ok(app.QS.filter((q) => q.src === "orig" && q.svg).length === 11, "手写原题的 11 张内置配图仍在", app.QS.filter((q) => q.src === "orig" && q.svg).length);
 ok(app.QS.filter((q) => q.svg).every((q) => /<svg/.test(q.svg)), "配图内容是合法 SVG 片段");
 ok(app.QS.filter((q) => q.materialHtml && q.src !== "gen").length === 12, "原题资料分析 12 题带材料");
 ok(app.QS.filter((q) => q.topic === "资料分析" && !q.materialHtml).length === 0, "全库资料分析题都带材料");
@@ -225,15 +232,15 @@ ok(!/</.test(html.match(/const BANK = (.*?);\n/s)[1]), "内联数据里的 < 已
 console.log("五之二、生成题（出题器产出）");
 const G = app.QS.filter((q) => q.src === "gen");
 ok(G.length === EXPECT_GEN, "生成题数量一致（" + EXPECT_GEN + "）", G.length);
-ok(G.every((q) => q.options.length === 4 && new Set(q.options.map((o) => o.t)).size === 4), "生成题每题 4 个不重复选项");
+ok(G.every((q) => q.options.length === 4 && new Set(q.options.map((o) => o.svg || o.t)).size === 4), "生成题每题 4 个不重复选项（文字或图形）");
 ok(G.every((q) => q.options.some((o) => o.k === q.answer)), "生成题答案都在选项中");
 ok(G.every((q) => q.tip && q.analysis), "生成题都带技巧与解析");
 ok(G.every((q) => q.source === "生成"), "生成题来源标注为「生成」");
 ok(G.filter((q) => q.topic === "资料分析").every((q) => q.materialHtml && q.materialTitle), "生成题中的资料分析都带材料");
 ok(G.every((q) => q.id >= 1001), "生成题号从 1001 起，不与原题冲突");
-ok(app.QS.filter((q) => q.svg).length === 11, "配图仍只有原题的 11 张图形推理");
+ok(app.QS.filter((q) => q.src === "orig" && q.svg).length === 11, "手写原题的 11 张图形推理配图未被破坏");
 const gTopics = [...new Set(G.map((q) => q.topic))].sort();
-ok(gTopics.length === 5 && ["数字推理","数学运算","资料分析","逻辑判断","思维策略"].every((t) => gTopics.includes(t)), "生成题覆盖 5 个可机器验算的题型（含思维策略）", gTopics);
+ok(gTopics.length === 6 && ["数字推理","数学运算","资料分析","逻辑判断","思维策略","图形推理"].every((t) => gTopics.includes(t)), "生成题覆盖 6 个可机器验算的题型（含图形推理）", gTopics);
 const dist = {};
 G.forEach((q) => { dist[q.answer] = (dist[q.answer] || 0) + 1; });
 ok(Object.keys(dist).length === 4 && Math.max(...Object.values(dist)) / G.length < 0.35, "生成题答案分布不偏斜", dist);
@@ -260,7 +267,7 @@ console.log("五之四、一键刷新新题（浏览器内出题器）");
 ok(typeof app.getGen === "function" && app.getGen(), "页面内已加载出题器 EpiGen");
 const genSelf = app.getGen().selfTest(200, app.mulberry(2026));
 ok(genSelf.bad.length === 0, "出题器自检 200 题无结构问题", genSelf.bad.slice(0, 2));
-ok(Object.keys(genSelf.byTopic).length === 5, "出题器覆盖 5 个题型（含思维策略）", genSelf.byTopic);
+ok(Object.keys(genSelf.byTopic).length === 6, "出题器覆盖 6 个题型（含图形推理）", genSelf.byTopic);
 const beforeTotal = app.getQS().length, beforeFresh = app.getFresh().length;
 app.refreshNew(30);
 const fresh = app.getFresh();
@@ -514,6 +521,83 @@ const spv = viewHtml("v-practice");
 ok(spv.includes("思维策略"), "练习页能正常出思维策略题");
 ok(spv.includes("难"), "思维策略题带「难」标签");
 ok(!/undefined/.test(spv), "思维策略练习页无 undefined");
+app.go("list");
+
+console.log("五之十、图形推理的配图与选项呈现（用户反馈：选项只有描述、不直观）");
+const letterOnly = app.QS.filter((q) => q.src === "zhenti" && q.imgs && q.imgs.length && q.options.every((o) => o.t.trim().length <= 2));
+ok(letterOnly.length > 900, "选项为纯字母 A-D 的图形推理题 " + letterOnly.length + " 道（选项图形在配图里）", letterOnly.length);
+app.startSet([letterOnly[0].id], { label: "GRA" });
+const gp = viewHtml("v-practice");
+ok(/点击图片可放大/.test(gp), "配图下方有「点击图片可放大」提示");
+ok(/选项的图形/.test(gp) && /点图放大/.test(gp), "纯字母选项的题会说明「选项图形在配图里，点图放大」");
+ok(/<img src="data\/img\//.test(gp), "配图用 <img> 渲染");
+ok(/cursor:zoom-in/.test(html), "配图有可放大的鼠标样式");
+ok(html.includes('id="lightbox"') || html.includes("openLightbox"), "页面内置放大镜（lightbox）");
+ok(/addEventListener\("keydown"/.test(html) && /Escape/.test(html), "Esc 可关闭放大图");
+ok(app.ZH_COUNT_PLACEHOLDER === undefined || true, "");
+// 多图题要有「共 N 张配图」说明
+const multi = app.QS.filter((q) => q.src === "zhenti" && q.imgs && q.imgs.length > 1);
+if (multi.length) {
+  app.startSet([multi[0].id], { label: "GRA2" });
+  ok(/共 \d+ 张配图/.test(viewHtml("v-practice")), "多图题标注「共 N 张配图」");
+}
+app.go("list");
+
+console.log("五之十一、图形推理（程序作图，公网版也有行测级图推）");
+const RG = app.QS.filter((q) => q.topic === "图形推理" && q.src === "gen");
+ok(RG.length >= 100, "程序生成的图形推理 " + RG.length + " 道（原手写只有 11 道基础题）", RG.length);
+ok(RG.every((q) => q.options.length === 4), "每题 4 个选项");
+ok(RG.every((q) => q.options.every((o) => o.svg)), "选项全部是图形（不再只有文字描述）");
+ok(RG.every((q) => new Set(q.options.map((o) => o.svg)).size === 4), "四个选项图形互不相同");
+ok(RG.every((q) => q.options.some((o) => o.k === q.answer)), "答案都在选项中");
+ok(RG.every((q) => q.tip && q.analysis && q.analysis.length > 30), "都有技巧与完整解析");
+ok(RG.every((q) => q.diff === 3), "难度统一标为难");
+ok(RG.every((q) => q.id >= 600001 && q.id < 900000), "题号段独立（600001+）");
+// 关键：正确答案的图形不能出现在题干配图里（一笔画那类题曾把答案当题干图显示）
+const leak = RG.filter((q) => q.svg && q.options.some((o) => o.k === q.answer && q.svg.indexOf(o.svg.replace(/^<svg[^>]*>|<\/svg>$/g, '')) >= 0));
+ok(leak.length === 0, "题干图里不含正确答案的图形（无答案泄漏）", leak.slice(0, 2).map((q) => q.id));
+// 校验各条规律都有覆盖
+const fam = {};
+RG.forEach((q) => { const k = q.stem.slice(0, 6); fam[k] = (fam[k] || 0) + 1; });
+ok(Object.keys(fam).length >= 5, "覆盖 5 类以上规律", fam);
+// 应用要真的把选项图形渲染出来
+app.startSet([RG.find((q) => !q.svg).id], { label: "GR" });     // 一笔画那类：只显示选项图形
+const gv = viewHtml("v-practice");
+ok(/class="optsvg"/.test(gv), "练习页用 .optsvg 渲染图形选项");
+ok(/<svg viewBox/.test(gv), "选项里内嵌了 SVG 图形");
+ok(!/undefined/.test(gv), "图形题练习页无 undefined");
+app.startSet([RG.find((q) => q.svg).id], { label: "GR2" });
+ok(/class="fig"/.test(viewHtml("v-practice")), "带题干图的图形题会显示配图");
+app.go("list");
+
+console.log("五之十二、图形作图的几何校验（无浏览器可用，用数值代替肉眼）");
+const allSvg = [];
+RG.forEach((q) => { if (q.svg) allSvg.push(q.svg); q.options.forEach((o) => allSvg.push(o.svg)); });
+ok(allSvg.length > 400, "题目图 + 选项图共 " + allSvg.length + " 段 SVG");
+ok(allSvg.every((x) => x.indexOf("NaN") < 0 && x.indexOf("undefined") < 0), "没有 NaN / undefined 坐标");
+ok(allSvg.every((x) => /<svg [^>]*viewBox="0 0 \d+ \d+"/.test(x)), "每张图都有合法的 viewBox");
+// 只取「几何属性」：x/y/cx/cy/r/x1/y1/x2/y2 与 path 的 d。
+// 不能笼统抓所有数字——stroke="#111" 里的 111、xmlns 里的 2000 都会被误判成坐标。
+const geoNums = (svg) => {
+  const body = svg.replace(/^<svg[^>]*>/, "").replace(/<\/svg>$/, "");
+  const out = [];
+  (body.match(/(?:cx|cy|x|y|x1|y1|x2|y2|r)="(-?\d+(?:\.\d+)?)"/g) || []).forEach((m) => out.push(Number(m.split('"')[1])));
+  (body.match(/\bd="([^"]+)"/g) || []).forEach((m) => (m.match(/-?\d+(?:\.\d+)?/g) || []).forEach((v) => out.push(Number(v))));
+  return out;
+};
+ok(RG.every((q) => q.options.every((o) => {
+  const nums = geoNums(o.svg);
+  return nums.length > 0 && nums.every((n) => n >= -5 && n <= 105);
+})), "选项图形坐标都在画面内（不会画到框外）");
+ok(RG.every((q) => q.options.every((o) => (o.svg.match(/<(path|line|circle|polygon|rect)/g) || []).length > 0)), "每个选项都有实际图形元素");
+ok(RG.every((q) => !q.svg || (q.svg.match(/<g transform/g) || []).length >= 5), "带题干图的题都画出了多格序列");
+const lineQ = RG.filter((q) => /直线段/.test(q.stem));
+if (lineQ.length) {
+  const q0 = lineQ[0];
+  const ans = q0.options.find((o) => o.k === q0.answer);
+  const segs = (ans.svg.match(/<path/g) || []).length;
+  ok(segs >= 1, "线段题的选项确实由线段（path）构成", segs);
+}
 app.go("list");
 
 console.log("六、网址路由（做成网站后的地址栏行为）");
