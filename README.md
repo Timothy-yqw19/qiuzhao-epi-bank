@@ -70,20 +70,50 @@
 
 每题都带：题干 + 4 个选项 + **标准思路（技巧）** + 逐步解析 + 答案。11 张图形推理配图（SVG）已内联进 HTML。
 
+## 命令怎么复制（常见坑）
+
+下面所有命令块都写的是**本机真实绝对路径**，可以直接整段复制。但仍然注意三点：
+
+- **`$PY`、`$NODE`、`/path/to/...` 都是占位符**，直接粘会报 `command not found` 或 `no such file or directory`。用上面写好的完整路径。
+- **`#` 开头的行是注释**，粘进终端会被当成命令（`zsh: command not found: #`）。要么别粘，要么先去掉 `#`。
+- **别在家目录 `~` 里起服务**。`python3 -m http.server --directory .` 的 `.` 是「当前目录」，在 `~` 里执行就会把你整个家目录挂出去，页面只会显示目录列表、`sw.js` 标 404。用 `bash serve.sh`（它会自己切到项目目录），或者先 `cd` 到项目目录再起服务。
+- 端口被占用时（`Address already in use`）：先在前一个终端按 `Ctrl-C`，或 `bash serve.sh 8789` 换端口。
+
 ## 本机真题库（默认不随站点发布，重要）
 
 补上「无法机器生成」的题型：从公开的 [GongkaoNaoku](https://github.com/jangviktor-web/GongkaoNaoku)（Apache-2.0，代码）导入 **1500 道纯文字真题**，覆盖逻辑填空 200 / 片段阅读 200 / 语句表达 150 / 定义判断 200 / 类比推理 200 / 逻辑判断 150 / 常识判断 250 / 政治理论 150（政治理论是新增模块）。每题带源库的逐项解析，其中 550 道还带「⚡ 快速解法」。
 
-**怎么用**
+**怎么打开（本机已就绪，不用做任何导入步骤）**
 
 ```bash
-git clone https://gitee.com/jangviktor/GongkaoNaoku.git   # 国内速度更快；或 GitHub 同名仓库
-cd GongkaoNaoku && python3 assemble_db.py                 # 合并分卷，得到 kaogong.db（约 148 MB）
-cd /path/to/秋招行测题库
-$PY import_zhenti.py --db /path/to/GongkaoNaoku/kaogong.db  # 产出 data/zhenti.json
-# 然后用本地服务打开本站（不是 file://），真题库会自动载入
-python3 -m http.server 8788 --bind 127.0.0.1 --directory .
+cd "/Users/wangsheng/Documents/deepseek-harness/default-workspace/秋招行测题库"
+bash serve.sh
 ```
+
+脚本会打印两个地址，直接用浏览器打开即可（**不要用 `file://` 双击打开**，那样取不到真题库数据）：
+
+- 电脑：<http://127.0.0.1:8788/>
+- 手机（同一 Wi-Fi）：<http://192.168.1.6:8788/>
+
+打开后题库页会多出来源筛选「真题库·本机（1500）」，卡片带橙色「真题」徽标，练习页显示年份/地区/试卷来源。
+
+**如果换一台机器 / 想重新导入**
+
+数据和数据库都在被 git 忽略的目录里，仓库里没有。重新导入只要三步（`import_zhenti.py` 只用标准库，系统 `python3` 就能跑）：
+
+```bash
+# 1) 拿到题库（Gitee 国内更快，或 GitHub 同名仓库）
+cd ~ && git clone https://gitee.com/jangviktor/GongkaoNaoku.git && cd GongkaoNaoku && python3 assemble_db.py
+
+# 2) 转成本站格式（--db 用上一步生成的真实路径）
+cd "/Users/wangsheng/Documents/deepseek-harness/default-workspace/秋招行测题库"
+python3 import_zhenti.py --db ~/GongkaoNaoku/kaogong.db
+
+# 3) 起服务
+bash serve.sh
+```
+
+想少导一点可以用 `--scale 0.5`（按 1500 的一半取样）。
 
 载入后：题库页多一个来源筛选项「真题库·本机」，卡片带橙色「真题」徽标，练习页显示年份/地区/试卷来源；手机走局域网地址也能刷到真题。
 
@@ -109,11 +139,9 @@ python3 -m http.server 8788 --bind 127.0.0.1 --directory .
 **仓库根目录即静态站点**，任意静态托管都能用：
 
 ```bash
-# 本地起服务（已在跑）
-python3 -m http.server 8788 --bind 127.0.0.1 --directory .
-
-# 局域网给手机用（换成本机内网 IP，注意会暴露给同网段设备）
-python3 -m http.server 8788 --bind 0.0.0.0 --directory .
+cd "/Users/wangsheng/Documents/deepseek-harness/default-workspace/秋招行测题库"
+bash serve.sh            # 本机 + 局域网手机都能访问；端口冲突时会提示
+bash serve.sh 9000       # 换端口
 ```
 
 - **GitHub Pages**：推到 GitHub 后，仓库 **Settings → Pages → Source 选 `Deploy from a branch`，分支 `main`、目录 `/(root)`**，保存后约 1 分钟生效，网址形如 `https://<用户名>.github.io/<仓库名>/`。`.nojekyll` 已包含，不需要额外配置。
@@ -123,16 +151,20 @@ python3 -m http.server 8788 --bind 0.0.0.0 --directory .
 
 ## 重新生成
 
-```bash
-PY=/Users/wangsheng/.dsh/dsh-runtimes/dsh-primary-runtime/dependencies/python/bin/python3
-NODE=/Users/wangsheng/.dsh/dsh-runtimes/dsh-primary-runtime/dependencies/node/bin/node
+下面用的是本机 bundled 运行时的**真实绝对路径**（可直接复制）：
 
-$PY build_bank.py               # 源 md + figs/ → data/questions.json（134 道原题）
-$PY gen_quant.py                # 出题器 → data/generated.json（563 道生成题，自带反算自检）
-$PY build_html.py               # 合并两者 + app_template.html → index.html
-$PY build_site.py               # 生成站点文件到根目录（manifest、sw.js、图标、.nojekyll）
-$NODE verify_bank.js            # 186 项校验（数据 / 计划 / 生成题 / 一键刷新 / 计时器 / 真题库 / 全流程 / 富文本转义 / 路由 / 站点打包）
+```bash
+cd "/Users/wangsheng/Documents/deepseek-harness/default-workspace/秋招行测题库"
+
+"/Users/wangsheng/.dsh/dsh-runtimes/dsh-primary-runtime/dependencies/python/bin/python3" build_bank.py     # 源 md + figs/ → data/questions.json（134 道原题）
+"/Users/wangsheng/.dsh/dsh-runtimes/dsh-primary-runtime/dependencies/python/bin/python3" gen_quant.py      # 构建期出题器 → data/generated.json（563 道生成题，自带反算自检）
+"/Users/wangsheng/.dsh/dsh-runtimes/dsh-primary-runtime/dependencies/python/bin/python3" build_html.py     # 合并 + app_template.html + app_gen.js → index.html
+"/Users/wangsheng/.dsh/dsh-runtimes/dsh-primary-runtime/dependencies/python/bin/python3" build_site.py     # 生成站点文件到根目录（manifest、sw.js、图标、.nojekyll）
+
+"/Users/wangsheng/.dsh/dsh-runtimes/dsh-primary-runtime/dependencies/node/bin/node" verify_bank.js    # 189 项校验（数据 / 计划 / 生成题 / 一键刷新 / 计时器 / 真题库 / 全流程 / 富文本转义 / 路由 / 站点打包）
 ```
+
+> `build_site.py` 需要 Pillow（用来画 PWA 图标），所以用 bundled python；其余脚本用系统 `python3` 也行。
 
 - `build_bank.py`、`gen_quant.py` 都只读源文件，不改动原题库。
 - 想出更多生成题：改 `gen_quant.py` 的命令行参数（`--n-digital` / `--n-math` / `--n-material` / `--n-logic` / `--seed`），换个 seed 就是一套新题。
@@ -149,6 +181,7 @@ $NODE verify_bank.js            # 186 项校验（数据 / 计划 / 生成题 / 
 ├── icons/                # ★ PWA 图标
 ├── .nojekyll             # ★ GitHub Pages 用
 ├── README.md
+├── serve.sh              # 一键本地起服务（本机 + 局域网），自动切到项目目录
 ├── app_template.html     # 界面模板（改界面用）
 ├── build_bank.py         # 源题库 md → 结构化 JSON
 ├── gen_quant.py          # 构建期出题器（Python，内含逐题反算自检）
