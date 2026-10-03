@@ -145,6 +145,17 @@ details{border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin:
 details summary{cursor:pointer;font-weight:600;font-size:14px}
 .banner{background:var(--warn-soft);border:1px solid #f2ddb4;color:#7a4c07;border-radius:10px;padding:9px 13px;font-size:13.5px;margin-bottom:12px}
 .kbd{font:12px/1.6 ui-monospace,Menlo,monospace;background:#eef0f3;border-radius:5px;padding:1px 5px;color:var(--ink2)}
+.bigtimer{font:700 64px/1.15 ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums;letter-spacing:2px;text-align:center;margin:6px 0 2px}
+.bigtimer.break{color:var(--ok)}
+.bigtimer.paused{color:var(--ink3)}
+.phase{text-align:center;font-size:13.5px;color:var(--ink2);margin-bottom:12px}
+.timerbar{height:8px;background:#eef0f3;border-radius:99px;overflow:hidden;margin:12px 0 4px}
+.timerbar>i{display:block;height:100%;background:var(--acc);border-radius:99px;transition:width .3s}
+.timerbar.brk>i{background:var(--ok)}
+#timerChip{display:inline-flex;align-items:center;gap:5px;background:#eef0f3;border-radius:99px;padding:4px 10px;font-size:13px;
+  font-variant-numeric:tabular-nums;cursor:pointer;border:0;font-family:inherit;color:var(--ink)}
+#timerChip:hover{background:#e4e7ec}
+#timerChip.run{background:var(--acc-soft);color:var(--acc)}
 @media (max-width:640px){
   .hd{gap:8px} nav{width:100%;margin-left:0;overflow-x:auto}
   .qbody{padding:14px}
@@ -166,22 +177,60 @@ details summary{cursor:pointer;font-weight:600;font-size:14px}
   <section class="view" id="v-wrong"></section>
   <section class="view" id="v-notes"></section>
   <section class="view" id="v-plan"></section>
+  <section class="view" id="v-timer"></section>
   <section class="view" id="v-quick"></section>
   <section class="view" id="v-data"></section>
 </main>
 
 <script>
+/*__GEN__*/
 "use strict";
 const BANK = /*__BANK__*/;
 const APPENDIX = /*__APPENDIX__*/;
-const QS = BANK.questions;
-const BY_ID = {}; QS.forEach(q=>BY_ID[q.id]=q);
-const MODULES = []; QS.forEach(q=>{ if(!MODULES.includes(q.module)) MODULES.push(q.module); });
-const TOPICS = []; QS.forEach(q=>{ if(!TOPICS.includes(q.topic)) TOPICS.push(q.topic); });
-const N_ORIG = QS.filter(q=>q.src!=="gen").length;
-const N_GEN = QS.length - N_ORIG;
-const isGen = q => q.src==="gen";
+const BASE_QS = BANK.questions;
 const KEY = "epi_bank_v1";
+const FRESH_KEY = "epi_fresh_v1";
+const MAX_FRESH = 300;                 // 本机新生成题的保留上限（超出丢最早的，连带删其记录）
+
+/* 题目分三类：原题(orig) / 构建期生成(gen) / 本机一键刷新的新题(fresh) */
+const isOrig  = q => !q.src || q.src==="orig";
+const isBuilt = q => q.src==="gen";
+const isFresh = q => q.src==="fresh";
+const isGen   = q => isBuilt(q) || isFresh(q);   // 「程序生成」的统称
+
+let freshQs = [], freshSeq = 900000;
+let QS = [], BY_ID = {}, MODULES = [], TOPICS = [];
+let N_ORIG = 0, N_GEN = 0, N_FRESH = 0;
+
+function loadFresh(){
+  try{
+    const o = JSON.parse(localStorage.getItem(FRESH_KEY));
+    if(o && Array.isArray(o.list)){ freshQs = o.list; freshSeq = o.seq || 900000 + o.list.length; }
+  }catch(e){}
+}
+function saveFresh(){
+  try{ localStorage.setItem(FRESH_KEY, JSON.stringify({seq:freshSeq, list:freshQs})); }catch(e){ console.warn("新题保存失败", e); }
+}
+function pruneFresh(){
+  while(freshQs.length > MAX_FRESH){
+    const old = freshQs.shift();
+    if(S && S.rec && S.rec[old.id]) delete S.rec[old.id];   // 连带清掉记录，避免错题本指向已删除的题
+  }
+}
+function reindex(){
+  QS = BASE_QS.concat(freshQs);
+  BY_ID = {}; QS.forEach(q=>{ BY_ID[q.id]=q; });
+  MODULES = []; TOPICS = [];
+  QS.forEach(q=>{ if(!MODULES.includes(q.module)) MODULES.push(q.module);
+                  if(!TOPICS.includes(q.topic)) TOPICS.push(q.topic); });
+  N_ORIG = QS.filter(isOrig).length;
+  N_GEN  = QS.filter(isBuilt).length;
+  N_FRESH= QS.filter(isFresh).length;
+}
+function clearFresh(){
+  freshQs.forEach(q=>{ if(S.rec[q.id]) delete S.rec[q.id]; });
+  freshQs = []; saveFresh(); reindex(); save();
+}
 
 /* ---------------- 存储 ---------------- */
 let S = load();
@@ -231,8 +280,148 @@ function toast(msg){
   setTimeout(()=>{d.style.opacity="0";setTimeout(()=>d.remove(),250);},1600);
 }
 
+/* ---------------- 学习计时器（番茄钟 + 今日时长） ---------------- */
+function todayStr(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function fmtMS(ms){
+  const s=Math.max(0,Math.round(ms/1000));
+  return Math.floor(s/60)+":"+String(s%60).padStart(2,"0");
+}
+function fmtDur(ms){
+  const m=Math.round(ms/60000);
+  if(m<60) return m+" 分钟";
+  return Math.floor(m/60)+" 小时 "+String(m%60).padStart(2,"0")+" 分";
+}
+function timerInit(){
+  const T=S.timer||(S.timer={});
+  if(typeof T.focusMin!=="number") T.focusMin=25;
+  if(typeof T.breakMin!=="number") T.breakMin=5;
+  if(typeof T.rounds!=="number") T.rounds=0;
+  if(typeof T.totalMs!=="number") T.totalMs=0;
+  if(typeof T.todayMs!=="number") T.todayMs=0;
+  if(typeof T.running!=="boolean") T.running=false;
+  if(typeof T.mode!=="string") T.mode="focus";
+  if(typeof T.remainingMs!=="number") T.remainingMs=T.focusMin*60000;
+  if(T.day!==todayStr()){ T.day=todayStr(); T.todayMs=0; }   // 跨天归零
+  if(T.running && T.lastAt){
+    // 页面被关掉/休眠期间也在走：按墙钟补算（单次最多补 8 小时，防呆）
+    const gap=Math.min(Math.max(0,Date.now()-T.lastAt), 8*3600000);
+    if(gap>0) timerAdvance(gap, true);
+  }
+  T.lastAt=Date.now();
+}
+function timerAdvance(ms, silent){
+  const T=S.timer; if(!T) return;
+  if(T.mode==="focus"){ T.todayMs=(T.todayMs||0)+ms; T.totalMs=(T.totalMs||0)+ms; }
+  T.remainingMs-=ms;
+  let guard=0;
+  while(T.remainingMs<=0 && guard++<200){
+    if(T.mode==="focus"){ T.rounds=(T.rounds||0)+1; T.mode="break"; T.remainingMs+=T.breakMin*60000; }
+    else { T.mode="focus"; T.remainingMs+=T.focusMin*60000; }
+    if(!silent) timerNotify();
+  }
+  T.lastAt=Date.now();
+  save();
+}
+function timerChipText(){
+  const T=S.timer; if(!T) return "⏱ --:--";   // 页面刚加载时的兜底
+  return (T.mode==="focus"?"🍅 ":"☕ ")+fmtMS(T.remainingMs);
+}
+function timerNotify(){
+  const T=S.timer;
+  toast(T.mode==="break" ? "专注结束 🍅 去休息 "+T.breakMin+" 分钟" : "休息结束 ☕ 回来继续刷题");
+  try{                                   // 提示音：Web Audio 现场合成，不依赖音频文件
+    const AC=window.AudioContext||window.webkitAudioContext;
+    if(AC){ const ctx=new AC(), o=ctx.createOscillator(), g=ctx.createGain();
+      o.type="sine"; o.frequency.value=(T.mode==="break"?880:660);
+      o.connect(g); g.connect(ctx.destination); g.gain.value=0.12;
+      o.start(); setTimeout(()=>{ try{o.stop(); ctx.close();}catch(e){} }, 700); }
+  }catch(e){}
+  const base=document.title.replace(/^⏰ /,"");
+  let n=0; const iv=setInterval(()=>{ document.title=(n%2?"⏰ 时间到 · ":"")+base; if(++n>6){ clearInterval(iv); document.title=base; } }, 700);
+}
+function timerToggle(){
+  const T=S.timer; T.running=!T.running; T.lastAt=Date.now(); save(true); renderTimer(); renderTabs();
+  if(T.running) toast((T.mode==="focus"?"专注开始 🍅 ":"休息开始 ☕ ")+fmtMS(T.remainingMs));
+}
+function timerReset(){
+  const T=S.timer; T.running=false; T.mode="focus"; T.remainingMs=T.focusMin*60000; T.lastAt=Date.now();
+  save(true); renderTimer(); renderTabs(); toast("已重置到 "+T.focusMin+" 分钟专注");
+}
+function timerSkip(){
+  const T=S.timer;
+  if(T.mode==="focus"){ T.rounds=(T.rounds||0)+1; T.mode="break"; T.remainingMs=T.breakMin*60000; }
+  else { T.mode="focus"; T.remainingMs=T.focusMin*60000; }
+  T.lastAt=Date.now(); save(true); renderTimer(); renderTabs();
+}
+function timerPreset(min, brk){
+  const T=S.timer; T.focusMin=min; T.breakMin=brk; T.mode="focus"; T.running=false;
+  T.remainingMs=min*60000; T.lastAt=Date.now(); save(true); renderTimer(); renderTabs();
+  toast("已设为专注 "+min+" 分钟 / 休息 "+brk+" 分钟");
+}
+function renderTimer(){
+  if(!S.timer) timerInit();
+  const T=S.timer, total=(T.mode==="focus"?T.focusMin:T.breakMin)*60000;
+  const pct=Math.max(0,Math.min(100,100*(1-T.remainingMs/total)));
+  const presets=[[15,3],[25,5],[45,10],[60,10]];
+  $("#v-timer").innerHTML='<div class="card">'
+   +'<div class="row"><h2 style="margin:0">学习计时器</h2><span class="chip '+(T.running?"ok":"")+'">'+(T.running?"计时中":"已暂停")+'</span>'
+   +'<span class="spacer"></span><span class="muted">今日 '+fmtDur(T.todayMs)+' · 累计 '+fmtDur(T.totalMs)+' · 已完成 '+T.rounds+' 个番茄</span></div>'
+   +'<div class="bigtimer '+(T.mode==="break"?"break":"")+(T.running?"":" paused")+'">'+fmtMS(T.remainingMs)+'</div>'
+   +'<div class="phase">'+(T.mode==="focus"?"🍅 专注中（"+T.focusMin+" 分钟）":"☕ 休息中（"+T.breakMin+" 分钟）")+(T.running?"":" · 已暂停")+'</div>'
+   +'<div class="timerbar '+(T.mode==="break"?"brk":"")+'"><i style="width:'+pct.toFixed(1)+'%"></i></div>'
+   +'<div class="row" style="justify-content:center;margin-top:14px">'
+   +'<button class="btn primary" id="tToggle" style="min-width:120px">'+(T.running?"⏸ 暂停":"▶ 开始")+'</button>'
+   +'<button class="btn" id="tSkip">跳过本阶段</button>'
+   +'<button class="btn" id="tReset">重置</button>'
+   +'</div>'
+   +'<div class="row" style="justify-content:center;margin-top:12px">'
+   +presets.map(function(p){ return '<button class="btn '+(T.focusMin===p[0]&&T.breakMin===p[1]?"on":"")+'" data-preset="'+p[0]+','+p[1]+'">'+p[0]+" / "+p[1]+'</button>'; }).join("")
+   +'</div>'
+   +'<p class="muted" style="text-align:center;margin-top:12px">预设按钮是「专注分钟 / 休息分钟」。切到别的页签计时照常走，关掉页面再打开会按墙钟补算。</p>'
+   +'</div>'
+   +'<div class="card"><h3 style="margin-top:0">怎么用这个计时器</h3><ul class="tight">'
+   +'<li><b>一个番茄 = 一组题</b>：25 分钟正好做完「逻辑填空 12 题」或「数字推理 14 题」这类一组，做完立刻在题目下写思路笔记。</li>'
+   +'<li><b>休息别刷手机</b>：5 分钟起来走走、喝水，回来注意力能明显回升。</li>'
+   +'<li><b>和限时组卷配合</b>：需要模拟银行 EPI 的模块独立计时，就用「刷题计划」里每天的「开始」，那里是另一套倒计时，不影响这个番茄钟。</li>'
+   +'<li><b>今日/累计时长</b>只在「专注」阶段累计，休息不计入，能真实反映你刷了多久。</li>'
+   +'</ul></div>';
+  $("#tToggle").onclick=timerToggle;
+  $("#tSkip").onclick=timerSkip;
+  $("#tReset").onclick=timerReset;
+  $$("#v-timer [data-preset]").forEach(function(b){
+    b.onclick=function(){ const a=b.dataset.preset.split(","); timerPreset(Number(a[0]), Number(a[1])); };
+  });
+}
+function timerTick(){                     // 每秒调用；用墙钟差值，后台标签页被节流也不会走慢
+  const T=S.timer; if(!T) return;
+  if(T.running){ const now=Date.now(); const dt=Math.min(Math.max(0,now-(T.lastAt||now)), 60000); if(dt>0) timerAdvance(dt); }
+  const chip=document.getElementById("timerChip");
+  if(chip){ chip.textContent=timerChipText(); chip.className=T.running?"run":""; }
+  if(view==="timer"){                                  // 计时页只更新数字，避免整页重绘
+    const big=document.querySelector("#v-timer .bigtimer");
+    if(big){ big.textContent=fmtMS(T.remainingMs);
+      big.className="bigtimer "+(T.mode==="break"?"break":"")+(T.running?"":" paused"); }
+    const bar=document.querySelector("#v-timer .timerbar>i");
+    if(bar){ const total=(T.mode==="focus"?T.focusMin:T.breakMin)*60000;
+      bar.style.width=Math.max(0,Math.min(100,100*(1-T.remainingMs/total))).toFixed(1)+"%"; }
+  }
+}
+
+/* ---------------- 一键刷新新题 ---------------- */
+function refreshNew(n, topic){
+  if(typeof EpiGen === "undefined"){ toast("出题器未加载"); return; }
+  const made = EpiGen.refresh(n, topic ? [topic] : null);
+  if(!made.length){ toast("这次没生成出题，再点一次试试"); return; }
+  made.forEach(q=>{ q.id = ++freshSeq; });
+  freshQs = freshQs.concat(made);
+  pruneFresh();
+  saveFresh(); reindex(); save(); renderTabs();
+  startSet(made.map(q=>q.id), { label: (topic ? topic + " 新题 " : "新生成 ") + made.length + " 题" });
+  toast("已生成 " + made.length + " 道新题（答案均经反向验算）");
+}
+
 /* ---------------- 导航 ---------------- */
-const TABS=[["list","题库"],["practice","练习"],["wrong","错题本"],["notes","我的思路"],["plan","刷题计划"],["quick","速查卡"],["data","数据"]];
+const TABS=[["list","题库"],["practice","练习"],["wrong","错题本"],["notes","我的思路"],["plan","刷题计划"],["timer","计时"],["quick","速查卡"],["data","数据"]];
 let view="list";
 function renderTabs(){
   $("#tabs").innerHTML = TABS.map(([k,t])=>{
@@ -240,7 +429,13 @@ function renderTabs(){
     if(k==="wrong"){ const c=Object.keys(S.rec).filter(isWrong).length; if(c) n=' <span class="chip bad">'+c+"</span>"; }
     if(k==="notes"){ const c=Object.keys(S.rec).filter(id=>S.rec[id].note&&S.rec[id].note.trim()).length; if(c) n=' <span class="chip">'+c+"</span>"; }
     return '<button data-tab="'+k+'" class="'+(view===k?"on":"")+'">'+t+n+"</button>";
-  }).join("");
+  }).join("")
+   + '<button id="refreshBtn" class="btn primary" style="margin-left:8px" title="随机出 20 道新题并立刻开练（答案经反向验算）">🔄 刷新新题</button>'
+   + '<button id="timerChip" class="'+(S.timer&&S.timer.running?"run":"")+'" title="学习计时器：点击进入计时页">'+timerChipText()+'</button>';
+  const rb = document.getElementById("refreshBtn");
+  if(rb) rb.onclick=()=>refreshNew(20);
+  const tc = document.getElementById("timerChip");
+  if(tc) tc.onclick=()=>go("timer");
   $$("#tabs button").forEach(b=>b.onclick=()=>go(b.dataset.tab));
 }
 let suppressHash=false;
@@ -254,6 +449,7 @@ function showView(v){
   else if(v==="wrong") renderWrong();
   else if(v==="notes") renderNotes();
   else if(v==="plan") renderPlan();
+  else if(v==="timer") renderTimer();
   else if(v==="quick") renderQuick();
   else if(v==="data") renderData();
   window.scrollTo({top:0,behavior:"instant"});
@@ -333,6 +529,11 @@ function renderPractice(){
       +'<button class="btn" onclick="startRandom(20)">随机 20 题</button>'
       +'<button class="btn" onclick="startRandom(50)">随机 50 题</button>'
       +'<button class="btn" onclick="startSet(QS.filter(q=>!S.rec[q.id]||!S.rec[q.id].picked).map(q=>q.id),{label:\'未做题\'})">只做没做过的</button>'
+      +'</div>'
+      +'<div class="row" style="margin-top:10px">'
+      +'<button class="btn primary" onclick="refreshNew(20)">🔄 一键刷新 20 道新题</button>'
+      +'<button class="btn" onclick="refreshNew(50)">刷新 50 道</button>'
+      +'<button class="btn" onclick="refreshNew(100)">刷新 100 道</button>'
       +'</div>'
       +'<p class="muted" style="margin-top:10px">生成题由出题器按考点批量产出（数字推理、数学运算、资料分析、翻译推理），每题答案都由程序按规则反算校验；原题 134 道是手写真题/仿真题。</p></div>';
     return;
@@ -465,7 +666,7 @@ function startWrong(){ const ids=Object.keys(S.rec).filter(isWrong).map(Number).
 let fModule="", fTopic="", fState="", fText="", fSrc="";
 function renderList(){
   const modes=[["","全部"],["none","未做"],["bad","做错的"],["fav","收藏"],["doubt","存疑"],["note","有笔记"],["ana","无解析"]];
-  const srcs=[["","全部来源"],["orig","仅原题（"+N_ORIG+"）"],["gen","仅生成题（"+N_GEN+"）"]];
+  const srcs=[["","全部来源"],["orig","仅原题（"+N_ORIG+"）"],["gen","构建期生成（"+N_GEN+"）"],["fresh","本机新生成（"+N_FRESH+"）"]];
   $("#v-list").innerHTML='<div class="card">'
    +'<div class="row">'
    +'<select id="fm"><option value="">全部模块</option>'+MODULES.map(m=>'<option '+(fModule===m?"selected":"")+'>'+esc(m)+'</option>').join("")+'</select>'
@@ -478,7 +679,7 @@ function renderList(){
    +'<div class="row" style="margin-top:10px">'+modes.map(([k,t])=>'<button class="btn '+(fState===k?"on":"")+'" data-st="'+k+'">'+t+'</button>').join("")+'</div>'
    +'</div>'
    +'<div class="row" style="margin:0 0 10px"><span class="muted" id="cnt"></span>'
-   +'<span class="muted">· 原题 134 道为手写真题/仿真题；生成题由出题器按考点批量产出，答案经程序反算校验，解析为模板生成</span></div>'
+   +'<span class="muted">· 原题 '+N_ORIG+' 道为手写真题/仿真题；构建期生成 '+N_GEN+' 道；本机新生成 '+N_FRESH+' 道（可在「刷题计划」页一键刷新，上限 '+MAX_FRESH+' 题）</span></div>'
    +'<div class="grid" id="grid"></div>';
   const rebuild=()=>{ fModule=$("#fm").value; fTopic=$("#ft").value; fSrc=$("#fs").value; fText=$("#fq").value.trim(); drawGrid(); };
   $("#fm").onchange=rebuild; $("#ft").onchange=rebuild; $("#fs").onchange=rebuild;
@@ -491,8 +692,9 @@ function filtered(){
   return QS.filter(q=>{
     if(fModule && q.module!==fModule) return false;
     if(fTopic && q.topic!==fTopic) return false;
-    if(fSrc==="orig" && isGen(q)) return false;
-    if(fSrc==="gen" && !isGen(q)) return false;
+    if(fSrc==="orig" && !isOrig(q)) return false;
+    if(fSrc==="gen" && !isBuilt(q)) return false;
+    if(fSrc==="fresh" && !isFresh(q)) return false;
     if(fText && !(q.stem+" "+q.options.map(o=>o.t).join(" ")+" "+q.tip).includes(fText)) return false;
     const r=S.rec[q.id]||{};
     if(fState==="none" && r.picked) return false;
@@ -512,7 +714,7 @@ function drawGrid(){
     const dot=st==="ok"?'<span class="dot ok"></span>':st==="bad"?'<span class="dot bad"></span>':'<span class="dot"></span>';
     return '<div class="qcard" data-id="'+q.id+'">'
       +'<div class="top">'+dot+'<span class="no">'+q.id+'</span><span class="chip">'+esc(q.topic)+'</span>'
-      +(isGen(q)?'<span class="chip acc">生成</span>':'')
+      +(isFresh(q)?'<span class="chip ok">新生成</span>':isBuilt(q)?'<span class="chip acc">生成</span>':'')
       +(q.svg?'<span class="chip">图</span>':'')+(q.analysis?'':'<span class="chip warn">无解析</span>')
       +(r.fav?'<span class="chip ok">★</span>':'')+(r.doubt?'<span class="chip warn">?</span>':'')+'</div>'
       +'<div class="stem">'+esc(stemText(q))+'</div>'
@@ -620,7 +822,7 @@ const PLAN=[
 ];
 function selIds(sel){
   if(!sel) return [];
-  const pool = sel.orig ? QS.filter(q=>!isGen(q)) : QS;   // 21 天计划针对手写原题，生成题用于自由刷题
+  const pool = sel.orig ? QS.filter(isOrig) : QS;   // 21 天计划针对手写原题，生成题用于自由刷题
   if(sel.k==="r") return pool.filter(q=>q.id>=sel.a&&q.id<=sel.b).map(q=>q.id);
   if(sel.k==="m") return pool.filter(q=>q.module===sel.m).map(q=>q.id);
   if(sel.k==="t") return pool.filter(q=>q.topic===sel.t).map(q=>q.id);
@@ -645,6 +847,14 @@ function renderPlan(){
    +'<button class="btn" data-free="t:数学运算">数学运算专练（'+QS.filter(q=>q.topic==="数学运算"&&isGen(q)).length+'）</button>'
    +'<button class="btn" data-free="t:资料分析">资料分析专练（'+QS.filter(q=>q.topic==="资料分析"&&isGen(q)).length+'）</button>'
    +'<button class="btn" data-free="t:逻辑判断">翻译推理专练（'+QS.filter(q=>q.topic==="逻辑判断"&&isGen(q)).length+'）</button>'
+   +'</div>'
+   +'<h3 style="margin-top:16px">🔄 一键刷新新题（本机即时生成，不占存储上限 '+MAX_FRESH+' 题）</h3>'
+   +'<p class="muted" style="margin:0 0 8px">每次点都按规则重新出题并当场反向验算，答案不会错；已刷新 <b>'+N_FRESH+'</b> 题。刷新后立刻进入练习。</p>'
+   +'<div class="row">'
+   +'<button class="btn primary" data-refresh="20">刷新 20 题</button>'
+   +'<button class="btn" data-refresh="50">刷新 50 题</button>'
+   +'<button class="btn" data-refresh="100">刷新 100 题</button>'
+   +['数字推理','数学运算','资料分析','逻辑判断'].map(function(t){ return '<button class="btn" data-refresh-topic="'+t+'">'+t+' 新题 20</button>'; }).join("")
    +'</div></div>'
    +'<table class="list"><thead><tr><th>完成</th><th>天</th><th>任务</th><th>题量</th><th>限时</th><th>目标</th><th>当天要求</th><th></th></tr></thead><tbody>'
    +PLAN.map(p=>{ const n=selIds(p.sel).length; const isRev=p.sel.k==="review";
@@ -658,6 +868,8 @@ function renderPlan(){
     if(!ids.length) return toast("这一组暂时没有题（错题本可能是空的）");
     startSet(ids,{label:"D"+p.d+" "+p.t,minutes:p.min}); });
   $$("#v-plan [data-goto]").forEach(b=>b.onclick=()=>go(b.dataset.goto));
+  $$("#v-plan [data-refresh]").forEach(b=>b.onclick=()=>refreshNew(Number(b.dataset.refresh)));
+  $$("#v-plan [data-refresh-topic]").forEach(b=>b.onclick=()=>refreshNew(20, b.dataset.refreshTopic));
   $$("#v-plan [data-free]").forEach(b=>b.onclick=()=>{
     const v=b.dataset.free;
     if(v.startsWith("t:")){ const ids=QS.filter(q=>isGen(q)&&q.topic===v.slice(2)).map(q=>q.id); startSet(ids,{label:v.slice(2)+"专练"}); }
@@ -721,7 +933,10 @@ function renderData(){
    +'<div class="stat"><b>'+doubts+'</b><span>存疑</span></div>'
    +'<div class="stat"><b>'+fmtClock(totalMs)+'</b><span>累计作答时长</span></div>'
    +'<div class="stat"><b>'+acc(doneOrig)+'</b><span>原题正确率（'+doneOrig.length+'/'+N_ORIG+'）</span></div>'
-   +'<div class="stat"><b>'+acc(doneGen)+'</b><span>生成题正确率（'+doneGen.length+'/'+N_GEN+'）</span></div>'
+   +'<div class="stat"><b>'+acc(doneGen)+'</b><span>生成题正确率（'+doneGen.length+'/'+(N_GEN+N_FRESH)+'）</span></div>'
+   +'<div class="stat"><b>'+N_FRESH+'</b><span>本机刷新题（上限 '+MAX_FRESH+'）</span></div>'
+   +'<div class="stat"><b>'+fmtDur((S.timer&&S.timer.todayMs)||0)+'</b><span>今日专注时长</span></div>'
+   +'<div class="stat"><b>'+fmtDur((S.timer&&S.timer.totalMs)||0)+'</b><span>累计专注时长</span></div>'
    +'</div></div>'
    +'<div class="card"><h2>按模块</h2><table class="list"><thead><tr><th>模块</th><th>已做/总数</th><th>正确率</th><th>错题</th></tr></thead><tbody>'+modRows+'</tbody></table></div>'
    +'<div class="card"><h2>按题型</h2><table class="list"><thead><tr><th>题型</th><th>题量</th><th>已做</th><th>正确率</th></tr></thead><tbody>'+topRows+'</tbody></table></div>'
@@ -736,6 +951,7 @@ function renderData(){
    +'<button class="btn" id="expMD">导出错题本 Markdown</button>'
    +'<button class="btn" id="expNotes">导出我的思路 Markdown</button>'
    +'<span class="spacer"></span>'
+   +'<button class="btn" id="clrFresh">清空本机新题（'+N_FRESH+'）</button>'
    +'<button class="btn" id="clrRec">清空做题记录</button>'
    +'<button class="btn" id="clrNote">清空笔记</button>'
    +'<button class="btn" id="clrAll">全部重置</button>'
@@ -754,13 +970,15 @@ function renderData(){
     if(!ids.length) return toast("还没写笔记");
     const L=["# 我的行测解题思路",""]; ids.forEach(id=>{ const q=BY_ID[id]; L.push("## 第 "+id+" 题 · "+q.topic,"",stemText(q),"",S.rec[id].note,"","---",""); });
     download("我的思路.md", L.join("\n"), "text/markdown;charset=utf-8"); };
+  $("#clrFresh").onclick=()=>{ if(!confirm("清空本机刷新的 "+N_FRESH+" 道新题及其答题记录？（构建期题库不受影响）")) return;
+    clearFresh(); renderData(); renderTabs(); toast("已清空本机新题"); };
   $("#clrRec").onclick=()=>{ if(!confirm("清空做题记录与错题（笔记保留）？")) return;
     Object.keys(S.rec).forEach(id=>{ S.rec[id].picked=null; S.rec[id].correct=null; S.rec[id].wrong=0; S.rec[id].tries=0; S.rec[id].timeMs=0; });
     save(true); renderData(); renderTabs(); toast("已清空做题记录"); };
   $("#clrNote").onclick=()=>{ if(!confirm("清空所有笔记？建议先导出。")) return;
     Object.keys(S.rec).forEach(id=>S.rec[id].note=""); save(true); renderData(); renderTabs(); toast("已清空笔记"); };
   $("#clrAll").onclick=()=>{ if(!confirm("全部重置（进度、错题、笔记、计划勾选）？此操作不可撤销。")) return;
-    S=blank(); save(true); renderData(); renderTabs(); toast("已重置"); };
+    S=blank(); timerInit(); save(true); renderData(); renderTabs(); toast("已重置"); };
 }
 
 /* ---------------- 键盘 ---------------- */
@@ -787,8 +1005,13 @@ document.addEventListener("visibilitychange",()=>{ if(document.hidden){ bankTime
 if(typeof navigator!=="undefined" && navigator.serviceWorker && /^https?:$/.test(location.protocol)){
   window.addEventListener("load",()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 }
+loadFresh();
+reindex();
+timerInit();
+setInterval(timerTick, 1000);
 document.title="秋招行测题库 · 银行 EPI "+QS.length+" 题";
-const _sub=document.getElementById("hdsub"); if(_sub) _sub.textContent="银行 EPI · 原题 "+N_ORIG+" + 生成 "+N_GEN+" · 离线可用";
+const _sub=document.getElementById("hdsub");
+if(_sub) _sub.textContent="银行 EPI · 原题 "+N_ORIG+" + 生成 "+N_GEN+(N_FRESH?" + 新题 "+N_FRESH:"")+" · 离线可用";
 renderTabs();
 if(location.hash) applyRoute(); else go("list");
 </script>

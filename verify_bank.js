@@ -51,11 +51,11 @@ const localStorage = {
   setItem: (k, v) => { mem[k] = String(v); },
   removeItem: (k) => { delete mem[k]; },
 };
-const window = {
-  addEventListener: (ev, fn) => { (winListeners[ev] = winListeners[ev] || []).push(fn); },
-  scrollTo: () => {},
-};
 const winListeners = {};
+// 浏览器里 window 就是全局对象（window.EpiGen === EpiGen），这里用 globalThis 等价模拟
+const window = globalThis;
+globalThis.addEventListener = (ev, fn) => { (winListeners[ev] = winListeners[ev] || []).push(fn); };
+globalThis.scrollTo = () => {};
 const location = { hash: "", protocol: "http:" };
 const history = { replaceState: (a, b, url) => { const m = /#.*$/.exec(String(url || "")); if (m) location.hash = m[0]; } };
 const navigator = {};   // 无 serviceWorker，启动时应跳过注册
@@ -66,7 +66,11 @@ const factory = new Function(
   code + `
   ;return {QS,BY_ID,PLAN,APPENDIX,selIds,wrongMD,wrongCSV,stemText,R,isWrong,stateOf,filtered,
            getS:()=>S, KEY, go, startSet, pick, next, finishSet, jump, startWrong, save,
-           getView:()=>view, getCur:()=>cur(), getQueue:()=>queue, applyRoute};`
+           getView:()=>view, getCur:()=>cur(), getQueue:()=>queue, applyRoute,
+           getGen:()=>globalThis.EpiGen, mulberry:(a)=>function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return ((t^t>>>14)>>>0)/4294967296;},
+           getFresh:()=>freshQs, getQS:()=>QS, refreshNew, clearFresh, MAX_FRESH, BY_ID_GET:(id)=>BY_ID[id],
+           getTimer:()=>S.timer, timerInit, timerAdvance, timerToggle, timerReset, timerSkip, timerPreset, timerChipText, todayStr,
+           wrongList:()=>Object.keys(S.rec).filter(isWrong).map(Number)};`
 );
 const app = factory(document, window, localStorage, function () {}, { createObjectURL: () => "", revokeObjectURL: () => {} },
   function () {}, () => {}, () => true, () => {}, location, history, navigator);
@@ -238,6 +242,105 @@ ok(!/\*\*/.test(qk2), "速查页无残留 ** 标记");
 ok(qk2.includes("比重差 &lt;"), "附录 A 里的 < 已转义（不再是裸标签）");
 ok(qk2.includes("|a \u2212 b|") || qk2.includes("|a − b|"), "附录 A 单元格内被转义的竖线已还原", qk2.includes("|a − b|"));
 ok(qk2.includes("<strong>组成相同看位置"), "图形推理题型提示里的 ** 已转成加粗");
+app.go("list");
+
+console.log("五之四、一键刷新新题（浏览器内出题器）");
+ok(typeof app.getGen === "function" && app.getGen(), "页面内已加载出题器 EpiGen");
+const genSelf = app.getGen().selfTest(200, app.mulberry(2026));
+ok(genSelf.bad.length === 0, "出题器自检 200 题无结构问题", genSelf.bad.slice(0, 2));
+ok(Object.keys(genSelf.byTopic).length === 4, "覆盖 4 个题型", genSelf.byTopic);
+const beforeTotal = app.getQS().length, beforeFresh = app.getFresh().length;
+app.refreshNew(30);
+const fresh = app.getFresh();
+ok(fresh.length === beforeFresh + 30, "刷新 30 题后本机题池 +30", fresh.length);
+ok(app.getQS().length === beforeTotal + 30, "全库同步扩容到 " + app.getQS().length + " 题", app.getQS().length);
+ok(fresh.every((q) => q.id > 900000), "新题号从 900001 起，与原题/构建期题不冲突");
+ok(new Set(app.getQS().map((q) => q.id)).size === app.getQS().length, "扩容后题号仍全局唯一");
+ok(fresh.every((q) => q.options.length === 4 && new Set(q.options.map((o) => o.t)).size === 4), "新题每题 4 个不重复选项");
+ok(fresh.every((q) => q.options.some((o) => o.k === q.answer)), "新题答案都在选项中");
+ok(fresh.every((q) => q.tip && q.analysis), "新题都带技巧与解析");
+ok(fresh.filter((q) => q.topic === "资料分析").every((q) => q.materialHtml), "新题中的资料分析带材料");
+ok(app.selIds({ k: "t", t: "数字推理" }).every((id) => app.BY_ID_GET(id)), "新题可通过筛选选中");
+const inSet = app.getQueue().some((id) => id > 900000);
+ok(inSet, "刷新后自动把新题组成本次练习队列");
+ok(!!mem["epi_fresh_v1"], "新题已写入 localStorage");
+const stored = JSON.parse(mem["epi_fresh_v1"]);
+ok(stored.list.length === fresh.length && stored.seq >= fresh[fresh.length - 1].id, "持久化内容含题池与题号游标");
+// 模拟「重新打开页面」：同一个 localStorage，重新执行一遍应用脚本
+const app2 = factory(document, window, localStorage, function () {}, { createObjectURL: () => "", revokeObjectURL: () => {} },
+  function () {}, () => {}, () => true, () => {}, location, history, navigator);
+ok(app2.getQS().length === app.getQS().length, "重开页面后新题被恢复（全库仍 " + app2.getQS().length + " 题）", app2.getQS().length);
+ok(app2.getFresh().length === fresh.length, "重开后本机新题数量一致");
+// 上限裁剪：塞满后不超上限，且被裁掉的题记录一并删除
+app.R(900001).picked = "A"; app.R(900001).correct = false; app.R(900001).wrong = 1;
+for (let i = 0; i < 14; i++) app.refreshNew(20);
+ok(app.getFresh().length <= app.MAX_FRESH, "刷新超过上限后自动裁剪到 " + app.MAX_FRESH + " 题", app.getFresh().length);
+ok(!app.BY_ID_GET(900001), "最早的新题已被裁剪");
+ok(!app.getS().rec[900001], "被裁剪题目的答题记录已同步清理（不会留孤儿错题）");
+ok(app.wrongList().every((id) => app.BY_ID_GET(id)), "错题本不会指向已删除的题");
+app.go("wrong");
+ok(!/undefined/.test(viewHtml("v-wrong")), "错题本渲染无 undefined");
+// 清空本机新题
+app.clearFresh();
+ok(app.getFresh().length === 0 && app.getQS().length === beforeTotal, "清空本机新题后回到构建期题库规模", app.getQS().length);
+ok(JSON.parse(mem["epi_fresh_v1"]).list.length === 0, "清空后本地存储同步");
+app.go("list");
+
+console.log("五之五、学习计时器（番茄钟 + 今日时长）");
+app.timerInit();
+const T0 = app.getTimer();
+ok(T0 && T0.focusMin === 25 && T0.breakMin === 5, "初始为 25 分钟专注 / 5 分钟休息", [T0.focusMin, T0.breakMin]);
+ok(T0.day === app.todayStr(), "计时器记录当天日期（跨天会归零）", T0.day);
+ok(/^🍅 \d+:\d\d$/.test(app.timerChipText()), "顶部计时短标签格式正确", app.timerChipText());
+ok(T0.running === false, "初始未计时");
+app.timerToggle();
+ok(app.getTimer().running === true, "点开始后进入计时");
+const beforeFocus = app.getTimer().remainingMs, beforeToday = app.getTimer().todayMs;
+app.timerAdvance(60000);
+ok(app.getTimer().remainingMs === beforeFocus - 60000, "走过 60 秒，剩余时间同步减少", [beforeFocus, app.getTimer().remainingMs]);
+ok(app.getTimer().todayMs === beforeToday + 60000, "专注 60 秒计入今日时长", app.getTimer().todayMs);
+const beforeRounds = app.getTimer().rounds;
+app.timerAdvance(app.getTimer().remainingMs - 1000);      // 走到专注结束前 1 秒
+ok(app.getTimer().mode === "focus", "专注结束前仍处于专注阶段", app.getTimer().mode);
+app.timerAdvance(2000);                                   // 恰好跨过结束点
+ok(app.getTimer().mode === "break", "专注走完后自动切到休息", app.getTimer().mode);
+ok(app.getTimer().rounds === beforeRounds + 1, "完成一个番茄，计数 +1", app.getTimer().rounds);
+const todayAfter = app.getTimer().todayMs;
+app.timerAdvance(2 * 60000);                              // 休息中走 2 分钟（休息共 5 分钟）
+ok(app.getTimer().mode === "break", "休息途中仍处于休息阶段");
+ok(app.getTimer().todayMs === todayAfter, "休息时段不计入专注时长", app.getTimer().todayMs);
+// 一次推进跨过「休息 + 下一个专注」，应正确落到专注阶段
+app.timerAdvance(app.getTimer().remainingMs + 26 * 60000);
+ok(["focus", "break"].indexOf(app.getTimer().mode) >= 0 && app.getTimer().rounds >= beforeRounds + 2,
+  "一次大跨度推进能正确连续跳过多个阶段", [app.getTimer().mode, app.getTimer().rounds]);
+const modeBeforeSkip = app.getTimer().mode;
+app.timerSkip();
+ok(app.getTimer().mode !== modeBeforeSkip, "跳过按钮可手动切到下一阶段", [modeBeforeSkip, app.getTimer().mode]);
+app.timerPreset(45, 10);
+ok(app.getTimer().focusMin === 45 && app.getTimer().remainingMs === 45 * 60000, "预设 45/10 生效并重置剩余时间", app.getTimer().remainingMs);
+ok(app.getTimer().running === false, "换预设后处于暂停状态");
+app.timerReset();
+ok(app.getTimer().mode === "focus" && app.getTimer().remainingMs === 45 * 60000, "重置回到专注阶段");
+app.go("timer");
+const tv = viewHtml("v-timer");
+ok(tv.includes("bigtimer"), "计时页有大号数字");
+ok(count(tv, /data-preset=/g) === 4, "计时页有 4 个预设按钮", count(tv, /data-preset=/g));
+ok(tv.includes("今日") && tv.includes("累计"), "计时页显示今日/累计时长");
+app.go("data");
+ok(viewHtml("v-data").includes("今日专注时长"), "数据页显示今日专注时长");
+// 跨天归零
+app.getTimer().day = "2000-01-01"; app.getTimer().todayMs = 999999;
+app.timerInit();
+ok(app.getTimer().todayMs === 0 && app.getTimer().day === app.todayStr(), "跨天后今日时长归零");
+// 关页面期间的墙钟补算
+app.timerReset();
+app.getTimer().running = true;
+app.getTimer().lastAt = Date.now() - 3 * 60000;
+const remainBefore = app.getTimer().remainingMs;
+app.timerInit();
+ok(app.getTimer().remainingMs < remainBefore, "重新打开页面时按墙钟补算流逝时间", [remainBefore, app.getTimer().remainingMs]);
+ok(app.getTimer().running === true, "补算后仍在计时状态");
+app.timerReset();
 app.go("list");
 
 console.log("六、网址路由（做成网站后的地址栏行为）");

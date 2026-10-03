@@ -15,6 +15,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(HERE, "data", "questions.json")
 GEN = os.path.join(HERE, "data", "generated.json")
 TPL = os.path.join(HERE, "app_template.html")
+GENJS = os.path.join(HERE, "app_gen.js")
 OUT = os.path.join(HERE, "index.html")
 
 
@@ -109,8 +110,12 @@ def main():
             "questions": orig + gen}
     appendix = {k: md_block(v) for k, v in data["appendix"].items()}
 
+    with open(GENJS, encoding="utf-8") as f:
+        genjs = f.read()
+
     html = tpl.replace("/*__BANK__*/", js_json(bank))
     html = html.replace("/*__APPENDIX__*/", js_json(appendix))
+    html = html.replace("/*__GEN__*/", genjs)
 
     with open(OUT, "w", encoding="utf-8") as f:
         f.write(html)
