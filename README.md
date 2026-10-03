@@ -81,13 +81,24 @@
 
 ## 本机真题库（默认不随站点发布，重要）
 
-补上「无法机器生成」的题型：从公开的 [GongkaoNaoku](https://github.com/jangviktor-web/GongkaoNaoku)（Apache-2.0，代码）导入 **1500 道纯文字真题**，覆盖逻辑填空 200 / 片段阅读 200 / 语句表达 150 / 定义判断 200 / 类比推理 200 / 逻辑判断 150 / 常识判断 250 / 政治理论 150（政治理论是新增模块）。每题带源库的逐项解析，其中 550 道还带「⚡ 快速解法」。
+补上「无法机器生成」的题型：从公开的 [GongkaoNaoku](https://github.com/jangviktor-web/GongkaoNaoku)（Apache-2.0，代码）导入 **3522 道真题**：
+
+| 题型 | 题量 | 说明 |
+|---|---|---|
+| 逻辑填空 / 片段阅读 / 语句表达 | 300 / 300 / 200 | 言语理解 |
+| 定义判断 / 类比推理 / 逻辑判断 | 300 / 250 / 250 | 判断推理 |
+| **图形推理** | **1193** | 带配图（支持一题多图：题干图 + 选项图），共 2404 张图、约 14 MB |
+| 数学运算 | 235 | 原先完全没有导入 |
+| 资料分析 | 44 | 带材料 |
+| 常识判断 / 政治理论 | 300 / 150 | 政治理论是新增模块 |
+
+每题带源库的逐项解析，其中不少还带「⚡ 快速解法」。取样是**难题优先**：按「题型 + 是否国考 + 题干长度」估分，国考卷先按 40% 配额取（国考占 26%），因此整体难度明显高于全库均匀取样。每题还写入难度档（按本库内相对排名三等分，易/中/难 各 1174）。
 
 **怎么打开（本机已就绪，不用做任何导入步骤）——两种方式任选**
 
 **方式一：双击，零配置（推荐）**
 
-直接双击项目目录里的 **`zhenti.local.html`**（3.7 MB）。真题已经内嵌在这个文件里，**不需要起服务、不联网也能用**。
+直接双击项目目录里的 **`zhenti.local.html`**（8.1 MB / 4219 题）。真题题干已经内嵌在这个文件里，**不需要起服务、不联网也能用**；图形推理的配图放在 `data/img/`（约 14 MB），用相对路径引用，所以这个文件夹要跟 HTML 放在一起。
 
 > 它是 `build_html.py --with-zhenti` 生成的独立产物，和公网的 `index.html` 是两份文件：公网版不含真题（版权原因），这份只在本机。`zhenti.local.html` 与 `data/zhenti.json` 都已在 `.gitignore` 中。
 
@@ -188,7 +199,7 @@ cd "/Users/wangsheng/Documents/deepseek-harness/default-workspace/秋招行测�
 ```
 秋招行测题库/
 ├── index.html            # ★ 网站主页 / 单文件版（约 652 KB，697 题 + 11 张内联 SVG）
-├── zhenti.local.html     # ★ 双击即用的内嵌真题版（3.7 MB / 2197 题，**已 gitignore**，仅本机）
+├── zhenti.local.html     # ★ 双击即用的内嵌真题版（8.1 MB / 4219 题，**已 gitignore**，仅本机）
 ├── manifest.webmanifest  # ★ PWA 清单
 ├── sw.js                 # ★ Service Worker（离线）
 ├── icons/                # ★ PWA 图标
@@ -199,10 +210,11 @@ cd "/Users/wangsheng/Documents/deepseek-harness/default-workspace/秋招行测�
 ├── build_bank.py         # 源题库 md → 结构化 JSON
 ├── gen_quant.py          # 构建期出题器（Python，内含逐题反算自检）
 ├── app_gen.js            # 浏览器内出题器（一键刷新新题用，构建时内联进 index.html）
-├── import_zhenti.py      # 从 GongkaoNaoku 的 SQLite 题库导入真题（产出 data/zhenti.json，已 gitignore）
+├── import_zhenti.py      # 从 GongkaoNaoku 的 SQLite 题库导入真题（难题优先，产出 data/zhenti.json，已 gitignore）
+├── fetch_graphics.py     # 下载图形推理配图（产出 data/img/ + data/graphic_index.json，已 gitignore）
 ├── build_html.py         # 合并 + 生成 index.html
 ├── build_site.py         # 生成站点文件到根目录（PWA 图标、manifest、Service Worker）
-├── verify_bank.js        # 186 项校验
+├── verify_bank.js        # 228 项校验
 ├── parse_report.txt      # 原题解析告警报告
 ├── data/
 │   ├── questions.json    # 134 道手写原题

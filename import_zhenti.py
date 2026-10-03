@@ -17,6 +17,10 @@
   python3 import_zhenti.py                                  # 基础版（无图无材料）
   python3 import_zhenti.py --with-graphics --with-material  # 含图形推理与资料分析
   （--with-graphics 需要先跑 fetch_graphics.py 生成 data/graphic_index.json）
+
+关于图片下载的一个坑：raw.githubusercontent.com 在高并发下会返回 **404**（不是 429），
+最初用 8 并发时约 45% 的图被判为「不存在」；改成 3 并发 + 退避重试 + 上游 .png 兜底后，
+同一批图基本都能下到。所以看到失败率高，先怀疑限流，别急着认为源库缺图。
 """
 
 import argparse
@@ -37,7 +41,7 @@ TARGETS = [
     ("判断推理", "定义判断", ["定义判断"], 300, False, False),
     ("判断推理", "类比推理", ["类比推理"], 250, False, False),
     ("判断推理", "逻辑判断", ["逻辑判断"], 250, False, False),
-    ("判断推理", "图形推理", ["图形推理"], 500, True, False),
+    ("判断推理", "图形推理", ["图形推理"], 1500, True, False),
     ("数量关系", "数学运算", ["数学运算"], 240, False, False),
     ("资料分析", "资料分析", ["增长", "比重", "综合", "平均数", "其他", "倍数", "基期计算（增长类）"], 60, False, True),
     ("常识判断", "常识判断", ["人文常识", "科技常识", "法律常识", "地理国情", "经济常识"], 300, False, False),
@@ -102,7 +106,7 @@ def main():
             raise SystemExit("要带图请先跑：python3 fetch_graphics.py --want 500")
         with open(gpath, encoding="utf-8") as f:
             for it in json.load(f)["items"]:
-                graphic[str(it["qid"])] = it["img"]
+                graphic[str(it["qid"])] = it["imgs"]        # 一题可有多张图（题干图 + 选项图）
         print("图形推理图片索引: %d 张" % len(graphic))
 
     print("拉取候选题…")
@@ -176,7 +180,7 @@ def main():
             "paper": (paper or "").strip(),
             "year": (year or "").strip(),
             "region": (region or "").strip(),
-            "img": graphic.get(str(qid), ""),
+            "imgs": graphic.get(str(qid), []),
             "materialTitle": ("资料（%s）" % ((paper or "")[:26] or "真题")) if mat_html else "",
             "materialHtml": mat_html,
             "dscore": score, "diff": diff,
@@ -193,7 +197,7 @@ def main():
         for cat in cats:
             items = buckets.get(cat, [])
             if need_img:
-                items = [x for x in items if x["img"]]
+                items = [x for x in items if x["imgs"]]
             if need_mat:
                 items = [x for x in items if x["materialHtml"]]
             for it in items:
@@ -212,7 +216,7 @@ def main():
         def emit(it):
             """把一条候选写进结果，返回是否成功（题干/图片重复则丢弃）。"""
             nonlocal qid_out
-            key = ("img:" + it["img"]) if it.get("img") else norm_key(it["stem"])
+            key = ("img:" + "|".join(it["imgs"])) if it.get("imgs") else norm_key(it["stem"])
             if key in seen:
                 return False
             seen.add(key)
@@ -226,7 +230,7 @@ def main():
                 "diff": it["diff"], "dscore": it["dscore"],
                 "stem": it["stem"],
                 "options": it["options"],
-                "img": it["img"] or None,
+                "imgs": it["imgs"] or None,
                 "svg": None,
                 "tip": it["tip"], "analysis": it["analysis"],
                 "answer": it["answer"],
@@ -262,7 +266,7 @@ def main():
     # 难度按本库内相对排名重新分档（前 1/3 难、中 1/3、后 1/3 易），保证「只练难题」有足够题量
     if out_qs:
         for q in out_qs:
-            q["_s"] = q["dscore"] + (len(q["stem"]) / 1000.0) + (0.5 if q.get("img") else 0) + (0.5 if q.get("materialHtml") else 0)
+            q["_s"] = q["dscore"] + (len(q["stem"]) / 1000.0) + (0.5 if q.get("imgs") else 0) + (0.5 if q.get("materialHtml") else 0)
         ordered = sorted(out_qs, key=lambda q: q["_s"])
         n = len(ordered)
         lo, hi = n // 3, 2 * n // 3
@@ -298,7 +302,7 @@ def main():
         print("  %-14s %-10s %4d / %d" % (module, topic, taken, cap))
     print("  合计 %d 题 | 国考占 %d | 难度分布 易%d/中%d/难%d | 带图 %d | 带材料 %d" % (
         len(out_qs), gk, dist[1], dist[2], dist[3],
-        sum(1 for q in out_qs if q["img"]), sum(1 for q in out_qs if q["materialHtml"])))
+        sum(1 for q in out_qs if q["imgs"]), sum(1 for q in out_qs if q["materialHtml"])))
     if skipped:
         print("  跳过统计:", dict(sorted(skipped.items(), key=lambda x: -x[1])[:8]))
     print("\n⚠️ 仅供本机个人学习：已在 .gitignore 中，请勿提交或部署到公开站点。")

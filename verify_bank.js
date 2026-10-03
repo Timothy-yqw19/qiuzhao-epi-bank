@@ -434,9 +434,14 @@ ok(!/"src":"zhenti"/.test(html), "公网 index.html 没有真题条目（仅含�
 ok(!/"img":"data\/img/.test(html), "公网 index.html 没有本机图片路径");
 // 决定性泄漏判据：某道真题的「题干 + 四个选项」同时出现在公网页面里才算泄漏。
 // （只比对题干前 24 字会误报——图形推理的指令句与手写题第 100 题恰好同文案。）
-const leaked = (ZHENTI ? ZHENTI.questions : []).filter((q) =>
-  html.includes(q.stem) && q.options.every((o) => html.includes(o.t)));
-ok(leaked.length === 0, "公网页面零真题泄漏（题干+四选项同时命中 " + leaked.length + " 条）", leaked.slice(0, 2).map((q) => q.id));
+// 判据一（最可靠）：真题号一个都不该出现在公网页面里（原题 1-134、生成题 1001+，真题是 300001+）
+const leakedIds = (ZHENTI ? ZHENTI.questions : []).filter((q) => html.includes('"id":' + q.id + ","));
+ok(leakedIds.length === 0, "公网页面零真题号泄漏（命中 " + leakedIds.length + " 条）", leakedIds.slice(0, 3).map((q) => q.id));
+// 判据二：正文级比对，但**忽略单字母选项**——图形推理的选项就是 "A/B/C/D"，
+// 只按文本包含判断必然误报（与手写题第 100 题同一条指令句即可触发）。
+const leakedBody = (ZHENTI ? ZHENTI.questions : []).filter((q) =>
+  q.options.every((o) => o.t.length >= 2) && html.includes(q.stem) && q.options.every((o) => html.includes(o.t)));
+ok(leakedBody.length === 0, "公网页面零真题正文泄漏（题干+多字选项同时命中 " + leakedBody.length + " 条）", leakedBody.slice(0, 2).map((q) => q.id));
 
 console.log("五之八、难度分层 / 配图 / 测评限时（针对『题太简单』）");
 const Z2 = app.getQS().filter((q) => q.src === "zhenti");
@@ -446,9 +451,10 @@ Z2.forEach((q) => { dc[q.diff]++; });
 ok(dc[3] > 800 && dc[1] > 800, "三档难度都有足够题量（易" + dc[1] + "/中" + dc[2] + "/难" + dc[3] + "）", dc);
 const gk = Z2.filter((q) => /国考|国家公务员|中央机关/.test(q.paper || "")).length;
 ok(gk / Z2.length > 0.25, "国考（更难）占比升到 " + Math.round(gk / Z2.length * 100) + "%", gk);
-const withImg = Z2.filter((q) => q.img);
-ok(withImg.length > 400, "带配图的图形推理 " + withImg.length + " 道", withImg.length);
-ok(withImg.every((q) => fs.existsSync(path.join(__dirname, q.img))), "配图文件都在本地（可离线）");
+const withImg = Z2.filter((q) => q.imgs && q.imgs.length);
+ok(withImg.length > 1000, "图齐全的图形推理 " + withImg.length + " 道（原 89/500）", withImg.length);
+ok(withImg.some((q) => q.imgs.length > 1), "支持一题多图（题干图 + 选项图）");
+ok(withImg.every((q) => q.imgs.every((p) => fs.existsSync(path.join(__dirname, p)))), "配图文件都在本地（可离线）");
 const withMat = Z2.filter((q) => q.materialHtml);
 ok(withMat.length > 30, "带材料的资料分析 " + withMat.length + " 道", withMat.length);
 // 练习页要真的渲染出图片

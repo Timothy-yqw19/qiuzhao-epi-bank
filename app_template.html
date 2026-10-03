@@ -665,7 +665,7 @@ function renderPractice(){
    +'<div class="qbody">'
    +(q.materialHtml?'<div class="material"><div class="mtitle">'+esc(q.materialTitle)+'　<span class="chip" id="matToggle" style="cursor:pointer">收起材料</span></div><div id="matBody">'+q.materialHtml+'</div></div>':'')
    +(q.svg?'<div class="fig">'+q.svg+'</div>':'')
-   +(q.img?'<div class="fig"><img src="'+esc(q.img)+'" alt="题目配图"></div>':'')
+   +((q.imgs&&q.imgs.length)?'<div class="fig">'+q.imgs.map(function(src){return '<img src="'+esc(src)+'" alt="题目配图">';}).join("")+'</div>':'')
    +(isZhenti(q)&&(q.origin||q.paper)?'<div class="muted" style="margin:-6px 0 10px">来源：'+esc([q.origin,q.paper].filter(Boolean).join(" · "))+'</div>':'')
    +'<div class="stem">'+mdEsc(q.stem)+'</div>'
    +'<div class="opts">'+q.options.map(o=>'<button class="'+optCls(o)+'" data-k="'+o.k+'"><span class="k">'+o.k+'</span><span>'+esc(o.t)+'</span></button>').join("")+'</div>'
@@ -844,7 +844,7 @@ function drawGrid(){
     return '<div class="qcard" data-id="'+q.id+'">'
       +'<div class="top">'+dot+'<span class="no">'+q.id+'</span><span class="chip">'+esc(q.topic)+'</span>'
       +(isZhenti(q)?'<span class="chip warn">真题</span>':isFresh(q)?'<span class="chip ok">新生成</span>':isBuilt(q)?'<span class="chip acc">生成</span>':'')
-      +(q.svg||q.img?'<span class="chip">图</span>':'')+diffChip(q)+(q.analysis?'':'<span class="chip warn">无解析</span>')
+      +(q.svg||(q.imgs&&q.imgs.length)?'<span class="chip">图</span>':'')+diffChip(q)+(q.analysis?'':'<span class="chip warn">无解析</span>')
       +(r.fav?'<span class="chip ok">★</span>':'')+(r.doubt?'<span class="chip warn">?</span>':'')+'</div>'
       +'<div class="stem">'+esc(stemText(q))+'</div>'
       +'<div class="bot">'+(r.picked?'<span class="chip '+(st==="ok"?"ok":"bad")+'">已答 '+r.picked+'</span>':'<span class="chip">未做</span>')
