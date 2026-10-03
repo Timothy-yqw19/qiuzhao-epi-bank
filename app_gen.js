@@ -583,6 +583,46 @@
 
   function gcd(a, b) { while (b) { var t = a % b; a = b; b = t; } return a; }
 
+  /* 倒水：BFS 求最少步数（状态空间搜索） */
+  function jugBfs(a, b, target) {
+    var seen = { "0,0": 0 }, q = [[0, 0, 0]];
+    while (q.length) {
+      var cur = q.shift(), x = cur[0], y = cur[1], d = cur[2];
+      if (x === target || y === target) return d;
+      var nx = [[a, y], [x, b], [0, y], [x, 0],
+                [Math.max(0, x - (b - y)), Math.min(b, x + y)],
+                [Math.min(a, x + y), Math.max(0, y - (a - x))]];
+      for (var i = 0; i < nx.length; i++) {
+        var k = nx[i][0] + "," + nx[i][1];
+        if (seen[k] === undefined) { seen[k] = d + 1; q.push([nx[i][0], nx[i][1], d + 1]); }
+      }
+    }
+    return null;
+  }
+
+  /* 倒水：另一套完全不同的解法——「始终朝一个方向倒」的两种经典策略，取较小者。
+     两容器问题的最优解一定在其中之一，所以它能独立地验证 BFS 的结果。 */
+  function jugGreedy(a, b, target, startWithA) {
+    var x = 0, y = 0, steps = 0;
+    while (steps < 1000) {
+      if (x === target || y === target) return steps;
+      if (startWithA) {
+        if (x === 0) x = a;
+        else if (y === b) y = 0;
+        else { var p = Math.min(x, b - y); x -= p; y += p; }
+      } else {
+        if (y === 0) y = b;
+        else if (x === a) x = 0;
+        else { var p2 = Math.min(y, a - x); y -= p2; x += p2; }
+      }
+      steps++;
+    }
+    return Infinity;
+  }
+  function jugMinByGreedy(a, b, target) {
+    return Math.min(jugGreedy(a, b, target, true), jugGreedy(a, b, target, false));
+  }
+
   /* 1) 过桥问题：每次最多两人，需一人送回手电，求最短总时间（Dijkstra 求最优 + 还原步骤） */
   function gBridge() {
     var n = pick([4, 4, 4, 5]), times = [], guard = 0;
@@ -681,36 +721,26 @@
 
   /* 4) 倒水问题：两个容器量出目标水量，BFS 求最少操作次数并还原步骤 */
   function gJug() {
-    var a = ri(4, 9), b = ri(4, 9);
-    if (a === b) b = a + 1;
-    var g = gcd(a, b), opts = [];
-    for (var c = 1; c <= Math.max(a, b); c++) if (c % g === 0) opts.push(c);
+    // 容量取互质（gcd=1 时 1..max 都能量出），并排除「目标刚好等于某个容器容量」的废题
+    // （否则答案就是 1 步「直接装满」，没有思考价值）
+    var a = ri(4, 9), b = ri(4, 9), guard0 = 0;
+    while ((a === b || gcd(a, b) !== 1) && guard0++ < 60) { b = ri(4, 9); }
+    if (a === b || gcd(a, b) !== 1) return null;
+    var opts = [];
+    for (var c = 1; c <= Math.max(a, b); c++) if (c !== a && c !== b) opts.push(c);
     if (!opts.length) return null;
     var target = pick(opts);
-    var start = "0,0", seen = {}, q = [[0, 0, 0]], prevMap = {}, best = null;
-    seen[start] = 0;
-    while (q.length) {
-      var cur = q.shift(), x = cur[0], y = cur[1], d = cur[2];
-      if (x === target || y === target) { best = d; break; }
-      var nexts = [
-        [a, y, "把 " + a + " 升容器装满"], [x, b, "把 " + b + " 升容器装满"],
-        [0, y, "倒空 " + a + " 升容器"], [x, 0, "倒空 " + b + " 升容器"],
-        [Math.max(0, x - (b - y)), Math.min(b, x + y), "把 " + a + " 升容器的水倒入 " + b + " 升容器"],
-        [Math.min(a, x + y), Math.max(0, y - (a - x)), "把 " + b + " 升容器的水倒入 " + a + " 升容器"]
-      ];
-      for (var i = 0; i < nexts.length; i++) {
-        var key = nexts[i][0] + "," + nexts[i][1];
-        if (seen[key] === undefined) { seen[key] = d + 1; prevMap[key] = [x + "," + y, nexts[i][2]]; q.push([nexts[i][0], nexts[i][1], d + 1]); }
-      }
-    }
-    if (best === null) return null;
+    var best = jugBfs(a, b, target);
+    if (best === null || best < 2) return null;
+    if (best !== jugMinByGreedy(a, b, target)) return null;   // 两种独立解法必须一致，否则丢题
     return build("思维策略", "思维策略",
       "有两个容器，分别能装 " + a + " 升和 " + b + " 升水，一开始都是空的，没有刻度。" +
       "只允许「装满、倒空、互相倒」三种操作，最少需要几步才能量出正好 " + target + " 升水？",
       best, [best + 1, best + 2, Math.abs(a - b) + 1],
       "倒水问题用「状态搜索」：每一步都是一个 (容器A水量, 容器B水量) 的状态，从 (0,0) 开始逐层扩展，第一次出现目标水量时的步数就是最少步数。",
       "容器 A 容量 " + a + " 升、B 容量 " + b + " 升，要量出 " + target + " 升。按状态逐层扩展，最少 " + best + " 步可达到目标（关键是把每次操作看成一个状态转移，而不是凭感觉倒）。",
-      { ff: function (v) { return fmt(v, " 步"); }, check: function () { return best !== null && best > 0; } });
+      { ff: function (v) { return fmt(v, " 步"); },
+        check: function () { return best !== null && best >= 2 && target !== a && target !== b; } });
   }
 
   /* 5) 排队等候：单窗口，使所有人总等待时间最短（穷举所有排列验证 = 短作业优先） */
@@ -874,6 +904,14 @@
 
     // 顺序：13 < N ≤ 40 时应为 4 枚，且 1、3、9、27 能表示 40 = (3^4-1)/2
     eq("砝码上限公式 (3^4-1)/2", (Math.pow(3, 4) - 1) / 2, 40);
+
+    // 倒水：两套独立解法（BFS 状态搜索 vs 两向贪心）必须给出同一个最少步数；
+    // 定值只写手工验证过的经典例（3&5 量 4 升：装满5→倒进3(余2)→倒空3→2倒进3→装满5→倒1进3，共 6 步）
+    [[3, 5, 4], [4, 7, 2], [5, 8, 3], [4, 9, 7]].forEach(function (c) {
+      var rb = jugBfs(c[0], c[1], c[2]), rg = jugMinByGreedy(c[0], c[1], c[2]);
+      eq("倒水 " + c[0] + "&" + c[1] + " 量 " + c[2] + " 升：BFS 与贪心一致", rb, rg);
+    });
+    eq("倒水 3&5 量出 4 升最少步数（手工验证）", jugBfs(3, 5, 4), 6);
     return { ran: out.length, fail: fail };
   }
 

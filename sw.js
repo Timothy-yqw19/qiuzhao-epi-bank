@@ -1,5 +1,5 @@
 /* 秋招行测题库 Service Worker —— 版本随 index.html 内容变化，避免缓存陈旧 */
-const V = "epi-bank-de4b0ff241";
+const V = "epi-bank-ad10e0e490";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest",
                "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png"];
 

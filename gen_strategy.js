@@ -42,7 +42,7 @@ if (t.fail.length) {
   console.error("求解器回归未通过，拒绝出题：\n  " + t.fail.join("\n  "));
   process.exit(1);
 }
-console.log("求解器回归 %d 项通过" % t.ran);
+console.log("求解器回归 " + t.ran + " 项通过");
 
 G.setRng(mulberry32(seed));
 const qs = G.refresh(want, ["思维策略"]);
