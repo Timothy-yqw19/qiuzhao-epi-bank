@@ -17,6 +17,8 @@ DATA = os.path.join(HERE, "data", "questions.json")
 GEN = os.path.join(HERE, "data", "generated.json")
 STRAT = os.path.join(HERE, "data", "strategy.json")
 GRAF = os.path.join(HERE, "data", "graphics.json")
+FIN  = os.path.join(HERE, "data", "finance.json")
+FACTS= os.path.join(HERE, "data", "bankfacts.json")
 TPL = os.path.join(HERE, "app_template.html")
 GENJS = os.path.join(HERE, "app_gen.js")
 OUT = os.path.join(HERE, "index.html")
@@ -121,7 +123,16 @@ def main():
         for q in graf:
             q["src"] = "gen"
 
-    ids = [q["id"] for q in orig + gen + strat + graf]
+    extra = []                                   # 金融计算 / 银行常识（综合知识）
+    for path_ in (FIN, FACTS):
+        if os.path.exists(path_):
+            with open(path_, encoding="utf-8") as f:
+                part = json.load(f)["questions"]
+            for q in part:
+                q["src"] = "gen"
+            extra += part
+
+    ids = [q["id"] for q in orig + gen + strat + graf + extra]
     assert len(set(ids)) == len(ids), "题号冲突：原题与生成题 id 重叠"
 
     with_zhenti = "--with-zhenti" in sys.argv
@@ -134,9 +145,9 @@ def main():
 
     bank = {"meta": dict(data["meta"], origCount=len(orig), genCount=len(gen),
                          zhentiCount=len(zhenti), zhentiInlined=bool(zhenti),
-                         stratCount=len(strat), grafCount=len(graf),
-                         count=len(orig) + len(gen) + len(strat) + len(graf) + len(zhenti)),
-            "questions": orig + gen + strat + graf + zhenti}
+                         stratCount=len(strat), grafCount=len(graf), extraCount=len(extra),
+                         count=len(orig) + len(gen) + len(strat) + len(graf) + len(extra) + len(zhenti)),
+            "questions": orig + gen + strat + graf + extra + zhenti}
     appendix = {k: md_block(v) for k, v in data["appendix"].items()}
 
     with open(GENJS, encoding="utf-8") as f:
@@ -153,11 +164,12 @@ def main():
     size = os.path.getsize(target)
     if with_zhenti:
         print("已生成 %s（%.1f MB，共 %d 题 = 原题 %d + 生成 %d（含思维策略 %d）+ 真题 %d）—— 双击即可，无需起服务"
-              % (OUT_ZHENTI, size / 1048576, len(orig) + len(gen) + len(strat) + len(graf) + len(zhenti),
-                 len(orig), len(gen) + len(strat) + len(graf), len(strat) + len(graf), len(zhenti)))
+              % (OUT_ZHENTI, size / 1048576, len(orig) + len(gen) + len(strat) + len(graf) + len(extra) + len(zhenti),
+                 len(orig), len(gen) + len(strat) + len(graf) + len(extra), len(strat) + len(graf) + len(extra), len(zhenti)))
     else:
         print("已生成 %s（%.1f KB，共 %d 题 = 原题 %d + 生成 %d（含思维策略 %d），配图 %d 张）" % (
-            OUT, size / 1024, len(orig) + len(gen) + len(strat) + len(graf), len(orig), len(gen) + len(strat) + len(graf), len(strat) + len(graf),
+            OUT, size / 1024, len(orig) + len(gen) + len(strat) + len(graf) + len(extra), len(orig),
+            len(gen) + len(strat) + len(graf) + len(extra), len(strat) + len(graf) + len(extra),
             sum(1 for q in orig + gen if q.get("svg"))))
     return 0
 

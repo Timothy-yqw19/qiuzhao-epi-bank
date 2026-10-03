@@ -14,7 +14,11 @@ const stratPath = path.join(__dirname, "data", "strategy.json");
 const STRAT = fs.existsSync(stratPath) ? JSON.parse(fs.readFileSync(stratPath, "utf8")) : { questions: [] };
 const grafPath = path.join(__dirname, "data", "graphics.json");
 const GRAF = fs.existsSync(grafPath) ? JSON.parse(fs.readFileSync(grafPath, "utf8")) : { questions: [] };
-const EXPECT_GEN = genData.questions.length + STRAT.questions.length + GRAF.questions.length;   // 构建期生成题（含思维策略 / 图形推理）
+const finPath = path.join(__dirname, "data", "finance.json");
+const FIN = fs.existsSync(finPath) ? JSON.parse(fs.readFileSync(finPath, "utf8")) : { questions: [] };
+const factsPath = path.join(__dirname, "data", "bankfacts.json");
+const FACTS = fs.existsSync(factsPath) ? JSON.parse(fs.readFileSync(factsPath, "utf8")) : { questions: [] };
+const EXPECT_GEN = genData.questions.length + STRAT.questions.length + GRAF.questions.length + FIN.questions.length + FACTS.questions.length;   // 构建期生成题（含思维策略/图形推理/金融计算/银行常识）
 const EXPECT_TOTAL = 134 + EXPECT_GEN;
 const N_GEN_STUB = EXPECT_GEN;
 const zhentiPath = path.join(__dirname, "data", "zhenti.json");
@@ -124,7 +128,7 @@ const noAna = app.QS.filter((q) => !q.analysis).map((q) => q.id);
 ok(noAna.join(",") === "123,124,125,126,127,128,129,130,131,132,133,134", "无逐步解析的只剩原文的常识 12 题（生成题全部带解析）", noAna.length);
 ok(app.QS.every((q) => !/<script|onerror|javascript:/i.test(q.stem + q.tip + (q.analysis || ""))), "题目文本无可注入脚本片段");
 ok(app.QS.filter((q) => q.source && q.src !== "gen").map((q) => q.id).join(",") === "68,78,92", "原题来源标注如实反映原文（只有 3 题标了真题）");
-ok(app.QS.filter((q) => q.src === "gen").every((q) => q.source === "生成"), "生成题来源统一标注为「生成」");
+ok(app.QS.filter((q) => q.src === "gen").every((q) => q.source === "生成" || q.source === "自编"), "生成/自编题来源标注正确");
 
 console.log("二、刷题计划组卷");
 ok(app.PLAN.length === 21, "21 天计划");
@@ -235,12 +239,12 @@ ok(G.length === EXPECT_GEN, "生成题数量一致（" + EXPECT_GEN + "）", G.l
 ok(G.every((q) => q.options.length === 4 && new Set(q.options.map((o) => o.svg || o.t)).size === 4), "生成题每题 4 个不重复选项（文字或图形）");
 ok(G.every((q) => q.options.some((o) => o.k === q.answer)), "生成题答案都在选项中");
 ok(G.every((q) => q.tip && q.analysis), "生成题都带技巧与解析");
-ok(G.every((q) => q.source === "生成"), "生成题来源标注为「生成」");
+ok(G.every((q) => q.source === "生成" || q.source === "自编"), "生成/自编题来源标注正确");
 ok(G.filter((q) => q.topic === "资料分析").every((q) => q.materialHtml && q.materialTitle), "生成题中的资料分析都带材料");
 ok(G.every((q) => q.id >= 1001), "生成题号从 1001 起，不与原题冲突");
 ok(app.QS.filter((q) => q.src === "orig" && q.svg).length === 11, "手写原题的 11 张图形推理配图未被破坏");
 const gTopics = [...new Set(G.map((q) => q.topic))].sort();
-ok(gTopics.length === 6 && ["数字推理","数学运算","资料分析","逻辑判断","思维策略","图形推理"].every((t) => gTopics.includes(t)), "生成题覆盖 6 个可机器验算的题型（含图形推理）", gTopics);
+ok(["数字推理","数学运算","资料分析","逻辑判断","思维策略","图形推理","金融计算","银行常识"].every((t) => gTopics.includes(t)), "生成题覆盖 8 个题型（含金融计算/银行常识）", gTopics);
 const dist = {};
 G.forEach((q) => { dist[q.answer] = (dist[q.answer] || 0) + 1; });
 ok(Object.keys(dist).length === 4 && Math.max(...Object.values(dist)) / G.length < 0.35, "生成题答案分布不偏斜", dist);
@@ -267,7 +271,7 @@ console.log("五之四、一键刷新新题（浏览器内出题器）");
 ok(typeof app.getGen === "function" && app.getGen(), "页面内已加载出题器 EpiGen");
 const genSelf = app.getGen().selfTest(200, app.mulberry(2026));
 ok(genSelf.bad.length === 0, "出题器自检 200 题无结构问题", genSelf.bad.slice(0, 2));
-ok(Object.keys(genSelf.byTopic).length === 6, "出题器覆盖 6 个题型（含图形推理）", genSelf.byTopic);
+ok(Object.keys(genSelf.byTopic).length === 7, "出题器覆盖 7 个题型（含图形推理/金融计算）", Object.keys(genSelf.byTopic));
 const beforeTotal = app.getQS().length, beforeFresh = app.getFresh().length;
 app.refreshNew(30);
 const fresh = app.getFresh();
@@ -512,8 +516,8 @@ ok(freshS.length === 30 && freshS.every((q) => q.topic === "思维策略"), "一
 app.go("plan");
 const pf = viewHtml("v-plan");
 ok(pf.includes("银行 EPI 专项") && pf.includes("思维策略"), "刷题计划页有「银行 EPI 专项」入口");
-ok(/data-mine="strategy"/.test(pf), "有「思维策略 全部」按钮");
-ok(/data-mine="rush"/.test(pf), "有「思维策略 · 45 秒/题」按钮");
+ok(/data-mine="思维策略"/.test(pf), "有「思维策略 全部」按钮");
+ok(/data-mine="rush:思维策略"/.test(pf), "有「思维策略 · 45 秒/题」按钮");
 // 真的能一键起一组
 const stratIds = app.QS.filter((q) => q.topic === "思维策略").map((q) => q.id);
 app.startSet(stratIds, { label: "STRAT" });
@@ -598,6 +602,39 @@ if (lineQ.length) {
   const segs = (ans.svg.match(/<path/g) || []).length;
   ok(segs >= 1, "线段题的选项确实由线段（path）构成", segs);
 }
+app.go("list");
+
+console.log("五之十三、银行综合知识（金融计算 + 银行常识）");
+const FQ = app.QS.filter((q) => q.topic === "金融计算");
+const BQ = app.QS.filter((q) => q.topic === "银行常识");
+ok(FQ.length >= 200, "金融计算 " + FQ.length + " 题", FQ.length);
+ok(BQ.length >= 75, "银行常识 " + BQ.length + " 题", BQ.length);
+ok(FQ.every((q) => q.options.length === 4 && new Set(q.options.map((o) => o.t)).size === 4 && q.options.some((o) => o.k === q.answer)) &&
+   BQ.every((q) => q.options.length === 4 && new Set(q.options.map((o) => o.t)).size === 4 && q.options.some((o) => o.k === q.answer)),
+   "两类题都是 4 个不重复选项且答案在选项中");
+ok(FQ.every((q) => q.id >= 700001 && q.id < 800000) && BQ.every((q) => q.id >= 800001 && q.id < 900000), "题号段各自独立");
+// 关键：金融计算的答案必须与解析里算出的数字一致（否则答案和说明对不上）
+const finMismatch = FQ.filter((q) => {
+  const text = (q.options.find((o) => o.k === q.answer) || {}).t || "";
+  const num = (text.match(/-?\d+(?:\.\d+)?/g) || [])[0];
+  return num && q.analysis.indexOf(num) < 0;
+});
+ok(finMismatch.length === 0, "金融计算题：选项答案与解析中的计算结果一致", finMismatch.slice(0, 2).map((q) => q.id));
+// 银行常识：每条解析都要有依据（法规/官网/年份等）
+const noBasis = BQ.filter((q) => !/(法|条例|办法|规定|官网|年|制度|准则|依据)/.test(q.analysis));
+ok(noBasis.length === 0, "银行常识题：解析都注明了依据", noBasis.slice(0, 2).map((q) => q.id));
+ok(BQ.every((q) => q.analysis.length > 25), "银行常识题的解析都有实质内容");
+ok(BQ.every((q) => q.diff === 2 && FQ.every((q) => typeof q.diff === "number")), "难度标注存在");
+const finAns = {}; FQ.forEach((q) => { finAns[q.answer] = (finAns[q.answer] || 0) + 1; });
+ok(Object.keys(finAns).length === 4 && Math.max.apply(null, Object.values(finAns)) / FQ.length < 0.45, "金融计算答案分布不偏斜", finAns);
+// 应用里能正常出这两类题
+app.go("plan");
+const pf2 = viewHtml("v-plan");
+ok(pf2.includes("银行 EPI 专项") && pf2.includes("金融计算") && pf2.includes("银行常识"), "计划页有金融计算与银行常识入口");
+app.startSet(BQ.map((q) => q.id).slice(0, 5), { label: "BANK" });
+ok(!/undefined/.test(viewHtml("v-practice")), "银行常识题练习页无 undefined");
+app.startSet(FQ.map((q) => q.id).slice(0, 5), { label: "FIN" });
+ok(!/undefined/.test(viewHtml("v-practice")), "金融计算题练习页无 undefined");
 app.go("list");
 
 console.log("六、网址路由（做成网站后的地址栏行为）");

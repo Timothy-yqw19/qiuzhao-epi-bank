@@ -1034,10 +1034,14 @@ function renderPlan(){
    +'<h3 style="margin-top:16px">🏦 银行 EPI 专项（公考题库里没有的部分）</h3>'
    +'<p class="muted" style="margin:0 0 8px">六大行笔试的「思维策略」是独立模块，公考行测不考，所以只能由出题器生成：过桥最优安排、取石子博弈、称重找次品、倒水量水、排队最短等待、双人分工、砝码称重、网格最省路径——每题的最优解都用穷举/BFS/DP 现场算出并二次校验。</p>'
    +'<div class="row">'
-   +'<button class="btn primary" data-mine="strategy">思维策略 全部（'+QS.filter(function(q){return q.topic==="思维策略";}).length+' 题）</button>'
-   +'<button class="btn primary" data-refresh-topic="思维策略">思维策略 新题 20（即时生成）</button>'
-   +'<button class="btn" data-mine="rush">⏱ 思维策略 · 45 秒/题</button>'
+   +'<button class="btn primary" data-mine="思维策略">思维策略 全部（'+QS.filter(function(q){return q.topic==="思维策略";}).length+'）</button>'
+   +'<button class="btn" data-refresh-topic="思维策略">思维策略 刷 20</button>'
+   +'<button class="btn primary" data-mine="金融计算">金融计算 全部（'+QS.filter(function(q){return q.topic==="金融计算";}).length+'）</button>'
+   +'<button class="btn" data-refresh-topic="金融计算">金融计算 刷 20</button>'
+   +'<button class="btn primary" data-mine="银行常识">银行常识 全部（'+QS.filter(function(q){return q.topic==="银行常识";}).length+'）</button>'
+   +'<button class="btn" data-mine="rush:思维策略">⏱ 45 秒/题</button>'
    +'</div>'
+   +'<p class="muted" style="margin:8px 0 0">金融计算题由公式生成、答案可逐题验算；银行常识为手写，每条解析都注明依据。监管指标与银行数据会随时间调整，以题内标注的时间点为准。</p>'
    +'</div></div>'
    +'<table class="list"><thead><tr><th>完成</th><th>天</th><th>任务</th><th>题量</th><th>限时</th><th>目标</th><th>当天要求</th><th></th></tr></thead><tbody>'
    +PLAN.map(p=>{ const n=selIds(p.sel).length; const isRev=p.sel.k==="review";
@@ -1054,10 +1058,11 @@ function renderPlan(){
   $$("#v-plan [data-refresh]").forEach(b=>b.onclick=()=>refreshNew(Number(b.dataset.refresh)));
   $$("#v-plan [data-refresh-topic]").forEach(b=>b.onclick=()=>refreshNew(20, b.dataset.refreshTopic));
   $$("#v-plan [data-mine]").forEach(b=>b.onclick=()=>{
-    const ids=QS.filter(q=>q.topic==="思维策略").map(q=>q.id).sort(function(a,b){return a-b;});
-    if(!ids.length) return toast("思维策略题库为空");
-    if(b.dataset.mine==="rush"){ rushCfg().secs=45; save(true); startSet(ids,{label:"思维策略 · 45 秒/题"}); }
-    else { rushCfg().secs=0; save(true); startSet(ids,{label:"思维策略 全部"}); }
+    const v=b.dataset.mine, isRush=v.indexOf("rush:")===0, topic=isRush?v.slice(5):v;
+    const ids=QS.filter(q=>q.topic===topic).map(q=>q.id).sort(function(a,b){return a-b;});
+    if(!ids.length) return toast(topic+"题库为空");
+    if(isRush){ rushCfg().secs=45; save(true); startSet(ids,{label:topic+" · 45 秒/题"}); }
+    else { rushCfg().secs=0; save(true); startSet(ids,{label:topic+" 全部"}); }
   });
   $$("#v-plan [data-free]").forEach(b=>b.onclick=()=>{
     const v=b.dataset.free;

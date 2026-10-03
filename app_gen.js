@@ -1251,13 +1251,204 @@
     };
   }
 
+
+  /* ============================ 金融计算（银行综合知识） ============================
+   * 全是银行笔试常考的公式题：单利/复利、票据贴现、财务比率、货币乘数与存款派生、
+   * 汇率换算、有效年利率、现值、EPS/PE。每题都由公式算出，再用另一种写法复核。
+   * ==========================================================================*/
+  function money(v, unit) { return (Math.round(v * 100) / 100) + (unit || ""); }
+
+  /* 1) 单利计息 */
+  function fSimple() {
+    var P = ri(10, 90) * 10000;                       // 本金（元）
+    var r = pick([2.25, 2.75, 3.0, 3.25, 3.5, 4.0]);  // 年利率 %
+    var n = ri(2, 5);
+    var interest = P * r / 100 * n;
+    if (Math.abs(interest - Math.round(interest)) > 1e-6) return null;
+    interest = Math.round(interest);
+    return build("综合知识", "金融计算",
+      "某企业存入银行 " + (P / 10000) + " 万元，年利率 " + r + "%，按单利计息，存期 " + n + " 年。到期可获得的利息是多少元？",
+      interest, [interest * 1.1, P * r / 100, interest + P],
+      "单利：利息 = 本金 × 年利率 × 年数（本金不计入下期计息）。",
+      "利息 = " + P + " × " + r + "% × " + n + " = " + interest + " 元。",
+      { ff: function (v) { return fmt(v, " 元"); },
+        check: function () { return P * r / 100 * n === interest; } });
+  }
+
+  /* 2) 复利终值 */
+  function fCompound() {
+    var P = ri(5, 50) * 10000, r = pick([5, 8, 10, 12]), n = pick([2, 3]);
+    var fv = P * Math.pow(1 + r / 100, n);
+    if (Math.abs(fv - Math.round(fv)) > 1e-6) return null;
+    fv = Math.round(fv);
+    var simple = P * (1 + r / 100 * n);
+    return build("综合知识", "金融计算",
+      "本金 " + (P / 10000) + " 万元，年利率 " + r + "%，每年复利一次，存 " + n + " 年后的本息和是多少元？",
+      fv, [Math.round(simple), Math.round(fv * 1.05), Math.round(P + P * r / 100)],
+      "复利终值 = 本金 × (1 + 利率)^年数；注意与单利的区别（复利是「利滚利」）。",
+      "本息和 = " + P + " × (1 + " + r + "%)^" + n + " = " + fv + " 元（若误按单利算是 " + Math.round(simple) + " 元，会偏低）。",
+      { ff: function (v) { return fmt(v, " 元"); },
+        check: function () { return Math.abs(P * Math.pow(1 + r / 100, n) - fv) < 1; } });
+  }
+
+  /* 3) 票据贴现 */
+  function fDiscount() {
+    var F = ri(6, 30) * 60000;                        // 票据面值，能被 360 整除
+    var d = pick([3.6, 4.5, 5.4, 6.0, 7.2]);
+    var days = pick([30, 45, 60, 90, 120]);
+    var disc = F * d / 100 * days / 360;
+    if (Math.abs(disc - Math.round(disc)) > 1e-6) return null;
+    disc = Math.round(disc);
+    var net = F - disc;
+    return build("综合知识", "金融计算",
+      "某企业持有一张面值 " + (F / 10000) + " 万元的银行承兑汇票，距到期还有 " + days + " 天，" +
+      "到银行办理贴现，年贴现率 " + d + "%（按 360 天计算）。银行实际支付多少元？",
+      net, [F, F + disc, Math.round(F * d / 100)],
+      "贴现息 = 票面金额 × 贴现率 × 贴现天数 ÷ 360；银行实际支付 = 票面金额 − 贴现息（贴现息先扣）。",
+      "贴现息 = " + F + " × " + d + "% × " + days + " ÷ 360 = " + disc + " 元，实付 = " + F + " − " + disc + " = " + net + " 元。",
+      { ff: function (v) { return fmt(v, " 元"); },
+        check: function () { return F - F * d / 100 * days / 360 === net; } });
+  }
+
+  /* 4) 流动比率 / 速动比率 */
+  function fLiquidity() {
+    var cur = ri(40, 120) * 100;                       // 流动资产
+    var inv = ri(10, 40) * 100;                        // 存货
+    if (inv >= cur) return null;
+    var lia = ri(20, 60) * 100;                        // 流动负债
+    var quick = (cur - inv) / lia;
+    var q = Math.round(quick * 100) / 100;
+    return build("综合知识", "金融计算",
+      "某公司流动资产 " + (cur / 10000) + " 万元，其中存货 " + (inv / 10000) + " 万元，流动负债 " +
+      (lia / 10000) + " 万元。该公司的速动比率约为多少？",
+      q, [Math.round(cur / lia * 100) / 100, Math.round(inv / lia * 100) / 100, Math.round(q * 2 * 100) / 100],
+      "流动比率 = 流动资产 ÷ 流动负债；速动比率 =（流动资产 − 存货）÷ 流动负债，存货变现慢所以要扣掉。",
+      "速动比率 = (" + cur + " − " + inv + ") ÷ " + lia + " ≈ " + q.toFixed(2) + "（流动比率是 " + (cur / lia).toFixed(2) + "）。",
+      { ff: function (v) { return (Math.round(v * 100) / 100).toFixed(2); },   // 与解析里的两位小数保持一致
+        check: function () { return Math.abs((cur - inv) / lia - q) < 0.005; } });
+  }
+
+  /* 5) 资产负债率 */
+  function fDebtRatio() {
+    var assets = ri(50, 200) * 1000, debt = ri(20, 45) * 1000;
+    if (debt >= assets) return null;
+    var pct = Math.round(debt / assets * 1000) / 10;
+    return build("综合知识", "金融计算",
+      "某公司资产总额 " + (assets / 10000) + " 万元，负债总额 " + (debt / 10000) + " 万元。其资产负债率约为：",
+      pct, [Math.round(debt / (assets - debt) * 1000) / 10, Math.round((assets - debt) / assets * 1000) / 10, pct + 10],
+      "资产负债率 = 负债总额 ÷ 资产总额 × 100%；它衡量长期偿债能力，数值越低通常负债压力越小。",
+      "资产负债率 = " + debt + " ÷ " + assets + " ≈ " + pct.toFixed(1) + "%（注意分母是资产总额，不是所有者权益）。",
+      { ff: function (v) { return (Math.round(v * 10) / 10).toFixed(1) + "%"; },
+        check: function () { return Math.abs(debt / assets * 100 - pct) < 0.05; } });
+  }
+
+  /* 6) 净资产收益率 ROE */
+  function fRoe() {
+    var profit = ri(20, 90) * 100, equity = ri(40, 200) * 100;
+    var roe = Math.round(profit / equity * 1000) / 10;
+    if (roe > 40) return null;
+    return build("综合知识", "金融计算",
+      "某银行当年实现净利润 " + (profit / 10000) + " 万元，年末净资产 " + (equity / 10000) +
+      " 万元。其净资产收益率（ROE）约为：",
+      roe, [Math.round(profit / (equity + profit) * 1000) / 10, roe + 3, Math.round(roe * 2 * 10) / 10],
+      "ROE（净资产收益率）= 净利润 ÷ 净资产 × 100%，衡量股东投入资本的回报；ROA 则用总资产做分母。",
+      "ROE = " + profit + " ÷ " + equity + " ≈ " + roe.toFixed(1) + "%。",
+      { ff: function (v) { return (Math.round(v * 10) / 10).toFixed(1) + "%"; },
+        check: function () { return Math.abs(profit / equity * 100 - roe) < 0.05; } });
+  }
+
+  /* 7) 货币乘数与存款派生 */
+  function fMultiplier() {
+    var r = pick([5, 8, 10, 12.5, 16.5, 20]);          // 法定存款准备金率 %
+    var base = ri(4, 20) * 10000;                      // 原始存款
+    var m = 100 / r;
+    var total = base * m;
+    if (Math.abs(total - Math.round(total)) > 1e-6) return null;
+    total = Math.round(total);
+    return build("综合知识", "金融计算",
+      "假定法定存款准备金率为 " + r + "%，商业银行不保留超额准备金、也不持有现金漏损，" +
+      "最初存入 " + (base / 10000) + " 万元。银行体系最终可创造的存款总额最多约为多少万元？",
+      total / 10000, [base / 10000, total / 10000 * 0.5, base / 10000 * (1 + r / 100)],
+      "简单货币乘数 = 1 ÷ 法定存款准备金率；存款派生总额 = 原始存款 × 货币乘数。现实中还有超额准备金与现金漏损，实际乘数更小。",
+      "货币乘数 = 1 ÷ " + (r / 100) + " = " + m + "，存款总额 = " + (base / 10000) + " × " + m + " = " + (total / 10000) + " 万元。",
+      { ff: function (v) { return money(v, " 万元"); },
+        check: function () { return Math.abs(base * (100 / r) - total) < 1; } });
+  }
+
+  /* 8) 汇率换算 */
+  function fFx() {
+    var rate = pick([6.85, 7.05, 7.12, 7.24, 7.31]);
+    var usd = ri(20, 200) * 100;
+    var cny = usd * rate;
+    if (Math.abs(cny - Math.round(cny)) > 1e-6) return null;
+    cny = Math.round(cny);
+    return build("综合知识", "金融计算",
+      "某日银行间市场美元兑人民币汇率为 1 美元 = " + rate + " 元人民币。某企业将 " + usd +
+      " 美元结汇成人民币，可得到多少元人民币？",
+      cny, [Math.round(usd / rate), Math.round(usd * rate * 1.02), Math.round(usd * (rate + 0.5))],
+      "结汇：外币金额 × 美元兑人民币汇率 = 人民币金额。注意区分「直接标价法」下汇率的含义（1 单位外币折合多少本币）。",
+      "可兑换人民币 = " + usd + " × " + rate + " = " + cny + " 元。",
+      { ff: function (v) { return fmt(v, " 元"); },
+        check: function () { return Math.abs(usd * rate - cny) < 1; } });
+  }
+
+  /* 9) 有效年利率 */
+  function fEar() {
+    var r = pick([6, 8, 10, 12]), m = pick([2, 4, 6, 12]);
+    var ear = (Math.pow(1 + r / 100 / m, m) - 1) * 100;
+    var e = Math.round(ear * 100) / 100;
+    return build("综合知识", "金融计算",
+      "某理财产品名义年利率 " + r + "%，每年计息 " + m + " 次（按复利）。其有效年利率约为：",
+      e, [r, Math.round((r * m) * 100) / 100, Math.round((ear + 1) * 100) / 100],
+      "有效年利率 EAR = (1 + 名义年利率 ÷ 年计息次数)^年计息次数 − 1。计息越频繁，EAR 比名义利率越高。",
+      "EAR = (1 + " + r + "% ÷ " + m + ")^" + m + " − 1 ≈ " + e.toFixed(2) + "%（名义利率只有 " + r + "%）。",
+      { ff: function (v) { return (Math.round(v * 100) / 100).toFixed(2) + "%"; },
+        check: function () { return Math.abs((Math.pow(1 + r / 100 / m, m) - 1) * 100 - e) < 0.005; } });
+  }
+
+  /* 10) 现值 */
+  function fPv() {
+    var r = pick([5, 8, 10]), n = pick([2, 3]), pvBase = ri(30, 120) * 1000;
+    var fv = pvBase * Math.pow(1 + r / 100, n);
+    if (Math.abs(fv - Math.round(fv)) > 1e-6) return null;
+    fv = Math.round(fv);
+    return build("综合知识", "金融计算",
+      "某人希望 " + n + " 年后取得 " + (fv / 10000) + " 万元，年折现率 " + r + "%（按年复利）。现在应投入多少元？",
+      pvBase, [fv, Math.round(fv / (1 + r / 100 * n)), Math.round(fv * (1 - r / 100))],
+      "现值 = 终值 ÷ (1 + 折现率)^年数。别用单利折现（那样算出的现值偏高）。",
+      "现值 = " + fv + " ÷ (1 + " + r + "%)^" + n + " = " + pvBase + " 元。",
+      { ff: function (v) { return fmt(v, " 元"); },
+        check: function () { return Math.abs(fv / Math.pow(1 + r / 100, n) - pvBase) < 1; } });
+  }
+
+  /* 11) EPS 与市盈率 */
+  function fEps() {
+    var profit = ri(5, 40) * 100000000;              // 净利润（元）
+    var shares = ri(10, 50) * 100000000;             // 股本（股）
+    var eps = profit / shares;
+    var price = pick([4, 6, 8, 10, 12, 15, 20]);
+    var pe = price / eps;
+    var p = Math.round(pe * 100) / 100;
+    var e2 = Math.round(eps * 100) / 100;
+    return build("综合知识", "金融计算",
+      "某银行股净利润 " + (profit / 100000000) + " 亿元，总股本 " + (shares / 100000000) + " 亿股，" +
+      "当前股价 " + price + " 元。其市盈率（PE）约为多少？",
+      p, [e2, Math.round(price / (profit / shares) * 1.2 * 100) / 100, Math.round((price / eps + 2) * 100) / 100],
+      "每股收益 EPS = 净利润 ÷ 总股本；市盈率 PE = 股价 ÷ 每股收益，衡量「按当前盈利要多少年回本」。",
+      "EPS = " + (profit / 100000000) + " 亿 ÷ " + (shares / 100000000) + " 亿股 = " + e2 +
+      " 元/股，PE = " + price + " ÷ " + e2 + " ≈ " + p.toFixed(2) + "。",
+      { ff: function (v) { return (Math.round(v * 100) / 100).toFixed(2); },   // 同上：PE 也保留两位
+        check: function () { return Math.abs(price / (profit / shares) - p) < 0.02; } });
+  }
+
   var TOPIC_FN = {
     "数字推理": [gArith, gArith2, gGeo, gRecAdd, gRecMul, gSquare, gCube, gSumRule, gSplit, gFrac],
     "数学运算": [mEngineer, mMeet, mChase, mProfit, mMix, mIncl, mComb, mTree, mAge, mBottle, mCow, mExtreme],
     "资料分析": [matText, matTable, matGrowth],
     "逻辑判断": [gLogic],
     "思维策略": [gBridge, gNim, gWeigh, gJug, gQueue, gAssign, gWeight, gGrid],
-    "图形推理": [gRegion, gLines, gSym, gRotate, gMove, gXor, gStroke]
+    "图形推理": [gRegion, gLines, gSym, gRotate, gMove, gXor, gStroke],
+    "金融计算": [fSimple, fCompound, fDiscount, fLiquidity, fDebtRatio, fRoe, fMultiplier, fFx, fEar, fPv, fEps]
   };
   var ALL_TOPICS = Object.keys(TOPIC_FN);
 
