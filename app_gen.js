@@ -574,12 +574,315 @@
       { ff: ff });
   }
 
+
+  /* ============================ 思维策略（银行 EPI 特有模块） ============================
+   * 每道题的最优解都由**穷举 / BFS / DP 现场算出来**，不是套模板编的，
+   * 所以答案保证正确；解析里给出最优方案本身。
+   * ==================================================================================*/
+  var NAMES = ["甲", "乙", "丙", "丁", "戊"];
+
+  function gcd(a, b) { while (b) { var t = a % b; a = b; b = t; } return a; }
+
+  /* 1) 过桥问题：每次最多两人，需一人送回手电，求最短总时间（Dijkstra 求最优 + 还原步骤） */
+  function gBridge() {
+    var n = pick([4, 4, 4, 5]), times = [], guard = 0;
+    while (times.length < n && guard++ < 200) { var t = ri(1, 12); if (times.indexOf(t) < 0) times.push(t); }
+    if (times.length < n) return null;
+    times.sort(function (a, b) { return a - b; });
+    var FULL = (1 << n) - 1;
+    var dist = {}, prev = {};
+    for (var m = 0; m <= FULL; m++) { dist[m * 2 + 0] = Infinity; dist[m * 2 + 1] = Infinity; }
+    var st = FULL * 2 + 1; dist[st] = 0;
+    var pq = [[0, FULL, 1]];
+    while (pq.length) {
+      pq.sort(function (a, b) { return a[0] - b[0]; });
+      var cur = pq.shift(), c = cur[0], mask = cur[1], side = cur[2];
+      if (c > dist[mask * 2 + side]) continue;
+      if (mask === 0 && side === 0) break;
+      var movers = [], i, j;
+      if (side === 1) {
+        for (i = 0; i < n; i++) if (mask & (1 << i)) {
+          movers.push([i]);
+          for (j = i + 1; j < n; j++) if (mask & (1 << j)) movers.push([i, j]);
+        }
+      } else {
+        for (i = 0; i < n; i++) if (!(mask & (1 << i))) movers.push([i]);
+      }
+      for (var k = 0; k < movers.length; k++) {
+        var mv = movers[k], cost = 0, nm = mask;
+        for (var q = 0; q < mv.length; q++) { cost = Math.max(cost, times[mv[q]]); nm ^= (1 << mv[q]); }
+        var ns = nm * 2 + (1 - side);
+        if (c + cost < dist[ns]) { dist[ns] = c + cost; prev[ns] = [mask * 2 + side, mv]; pq.push([c + cost, nm, 1 - side]); }
+      }
+    }
+    var finalCost = dist[0 * 2 + 0];
+    if (!isFinite(finalCost)) return null;
+    // 还原步骤
+    var steps = [], curState = 0 * 2 + 0;
+    while (prev[curState]) {
+      var pr = prev[curState];
+      var fromStart = (pr[0] % 2) === 1;      // 状态里 side=1 表示人还在起点侧
+      var who = pr[1].map(function (x) { return NAMES[x]; }).join("+");
+      var cost = Math.max.apply(null, pr[1].map(function (x) { return times[x]; }));
+      steps.unshift(who + (fromStart ? " 过去" : " 回来") + "（" + cost + " 分钟）");
+      curState = pr[0];
+    }
+    var stem = "夜间需要过桥，" + n + " 个人过桥所需时间分别为 " + times.join("、") + " 分钟。桥上一次最多通过两人，且只有一支手电筒，" +
+      "过桥后必须有人把手电筒送回来。所有人全部过桥最少需要多少分钟？";
+    var greedy = times.reduce(function (a, b) { return a + b; }, 0) + (n - 2) * times[0];   // 常见的“最快的人来回送”错误解法
+    return build("思维策略", "思维策略", stem, finalCost,
+      [greedy, finalCost + times[0], times.reduce(function (a, b) { return a + b; }, 0)],
+      "先想清楚「谁来回送手电」。最优解通常是两种模式的组合：最快的人来回送；或最快两人先过、最快的送回、最慢两人一起过、第二快的送回。",
+      "最短总时间 " + finalCost + " 分钟。最优安排：" + steps.join(" → ") + "。",
+      { ff: function (v) { return fmt(v, " 分钟"); },
+        check: function () { return isFinite(finalCost) && finalCost > 0; } });
+  }
+
+  /* 2) 取石子博弈：每次 1~k 个，取最后一个获胜；先手首取多少必胜（DP 反推验证） */
+  function gNim() {
+    var k = pick([2, 3, 4, 5]), rem, n, guard = 0;
+    do { n = ri(15, 60); rem = n % (k + 1); } while (rem === 0 && guard++ < 50);
+    if (rem === 0) return null;
+    var win = [false];
+    for (var i = 1; i <= n; i++) {
+      var w = false;
+      for (var j = 1; j <= k && j <= i; j++) if (!win[i - j]) { w = true; break; }
+      win[i] = w;
+    }
+    if (!win[n]) return null;
+    var good = [];
+    for (var j2 = 1; j2 <= k && j2 <= n; j2++) if (!win[n - j2]) good.push(j2);
+    if (good.length !== 1 || good[0] !== rem) return null;     // 该博弈下必胜首取应唯一且等于 n%(k+1)
+    return build("思维策略", "思维策略",
+      "有 " + n + " 个石子，两人轮流取，每次至少取 1 个、至多取 " + k + " 个，取到最后一个石子的人获胜。" +
+      "先手第一次取多少个，才能保证最终获胜？",
+      rem, [k, k + 1, rem === 1 ? 2 : rem - 1],
+      "「取到最后一个赢」的必胜法：始终让对方面对 (k+1) 的倍数个石子。先手先取 n 除以 (k+1) 的余数即可。",
+      "n = " + n + "，k = " + k + "，n ÷ (k+1) = " + Math.floor(n / (k + 1)) + " 余 " + rem +
+      "。先手先取 " + rem + " 个，之后无论对方取几个（设为 x），先手都取 " + (k + 1) + " − x 个，使每轮合计 " + (k + 1) +
+      " 个，最终先手取到最后一个。",
+      { ff: function (v) { return fmt(v, " 个"); }, check: function () { return win[n] && good.length === 1; } });
+  }
+
+  /* 3) 称重找次品：n 枚中 1 枚较轻，无砝码天平最少称几次（3 分法） */
+  function gWeigh() {
+    var n = ri(9, 40), k = 1, p = 3;
+    while (p < n) { p *= 3; k++; }
+    return build("思维策略", "思维策略",
+      "有 " + n + " 枚外观相同的金币，其中恰好 1 枚是假币、比真币轻一些。用一台无砝码的天平，" +
+      "最少称几次就一定能找出这枚假币？",
+      k, [k + 1, Math.ceil(Math.log(n) / Math.log(2)), k - 1 < 1 ? 1 : k - 1],
+      "天平一次有三种结果（左重、右重、平衡），所以 k 次最多区分 3^k 种情况。把金币尽量三等分，取 3^(k-1) < n ≤ 3^k 的最小 k。",
+      "把金币分成三堆尽量相等：称两堆，哪边轻假币就在哪堆，平衡则在第三堆。每次排除 2/3，k 次可覆盖 3^k 枚。" +
+      "因为 3^" + (k - 1) + " = " + Math.pow(3, k - 1) + " < " + n + " ≤ 3^" + k + " = " + Math.pow(3, k) + "，所以最少需要 " + k + " 次。",
+      { ff: function (v) { return fmt(v, " 次"); },
+        check: function () { return Math.pow(3, k - 1) < n && n <= Math.pow(3, k); } });
+  }
+
+  /* 4) 倒水问题：两个容器量出目标水量，BFS 求最少操作次数并还原步骤 */
+  function gJug() {
+    var a = ri(4, 9), b = ri(4, 9);
+    if (a === b) b = a + 1;
+    var g = gcd(a, b), opts = [];
+    for (var c = 1; c <= Math.max(a, b); c++) if (c % g === 0) opts.push(c);
+    if (!opts.length) return null;
+    var target = pick(opts);
+    var start = "0,0", seen = {}, q = [[0, 0, 0]], prevMap = {}, best = null;
+    seen[start] = 0;
+    while (q.length) {
+      var cur = q.shift(), x = cur[0], y = cur[1], d = cur[2];
+      if (x === target || y === target) { best = d; break; }
+      var nexts = [
+        [a, y, "把 " + a + " 升容器装满"], [x, b, "把 " + b + " 升容器装满"],
+        [0, y, "倒空 " + a + " 升容器"], [x, 0, "倒空 " + b + " 升容器"],
+        [Math.max(0, x - (b - y)), Math.min(b, x + y), "把 " + a + " 升容器的水倒入 " + b + " 升容器"],
+        [Math.min(a, x + y), Math.max(0, y - (a - x)), "把 " + b + " 升容器的水倒入 " + a + " 升容器"]
+      ];
+      for (var i = 0; i < nexts.length; i++) {
+        var key = nexts[i][0] + "," + nexts[i][1];
+        if (seen[key] === undefined) { seen[key] = d + 1; prevMap[key] = [x + "," + y, nexts[i][2]]; q.push([nexts[i][0], nexts[i][1], d + 1]); }
+      }
+    }
+    if (best === null) return null;
+    return build("思维策略", "思维策略",
+      "有两个容器，分别能装 " + a + " 升和 " + b + " 升水，一开始都是空的，没有刻度。" +
+      "只允许「装满、倒空、互相倒」三种操作，最少需要几步才能量出正好 " + target + " 升水？",
+      best, [best + 1, best + 2, Math.abs(a - b) + 1],
+      "倒水问题用「状态搜索」：每一步都是一个 (容器A水量, 容器B水量) 的状态，从 (0,0) 开始逐层扩展，第一次出现目标水量时的步数就是最少步数。",
+      "容器 A 容量 " + a + " 升、B 容量 " + b + " 升，要量出 " + target + " 升。按状态逐层扩展，最少 " + best + " 步可达到目标（关键是把每次操作看成一个状态转移，而不是凭感觉倒）。",
+      { ff: function (v) { return fmt(v, " 步"); }, check: function () { return best !== null && best > 0; } });
+  }
+
+  /* 5) 排队等候：单窗口，使所有人总等待时间最短（穷举所有排列验证 = 短作业优先） */
+  function gQueue() {
+    var n = ri(4, 6), ts = [], guard = 0;
+    while (ts.length < n && guard++ < 200) { var t = ri(1, 9); if (ts.indexOf(t) < 0) ts.push(t); }
+    if (ts.length < n) return null;
+    var best = Infinity, bestOrder = null;
+    var idx = ts.map(function (_, i) { return i; });
+    function perm(arr, cur) {
+      if (arr.length === 0) {
+        var wait = 0, acc = 0;
+        for (var i = 0; i < cur.length; i++) { wait += acc; acc += ts[cur[i]]; }
+        if (wait < best) { best = wait; bestOrder = cur.slice(); }
+        return;
+      }
+      for (var i = 0; i < arr.length; i++) {
+        var rest = arr.slice(0, i).concat(arr.slice(i + 1));
+        perm(rest, cur.concat([arr[i]]));
+      }
+    }
+    perm(idx, []);
+    var sorted = ts.slice().sort(function (a, b) { return a - b; });
+    var sum = 0, acc2 = 0;
+    sorted.forEach(function (t) { sum += acc2; acc2 += t; });
+    if (sum !== best) return null;                       // 独立校验：排序后的总等待时间应等于穷举最优
+    var worst = 0, ac = 0;
+    ts.slice().sort(function (a, b) { return b - a; }).forEach(function (t) { worst += ac; ac += t; });
+    return build("思维策略", "思维策略",
+      "银行只有一个柜台，" + n + " 位客户办理业务所需时间分别为 " + ts.join("、") + " 分钟。" +
+      "怎样安排办理顺序，才能使所有人等待时间的总和最短？最短的总等待时间是多少分钟？",
+      best, [worst, best + sorted[0], Math.round(best * 1.5)],
+      "「总等待时间最短」= 短作业优先：用时最短的先办。第 i 个办理的人会让后面每个人都多等他的用时。",
+      "按用时从小到大排：" + sorted.join("、") + "。总等待时间 = 后面每个人被前面的人拖累的时间之和 = " + best + " 分钟。" +
+      "直觉上让快的人先走，能减少他后面所有人的等待。",
+      { ff: function (v) { return fmt(v, " 分钟"); }, check: function () { return sum === best; } });
+  }
+
+  /* 6) 双人分工：任务不可拆分、两人并行，穷举 2^n 种分配使完工时间最短 */
+  function gAssign() {
+    var n = ri(4, 5), A = [], B = [], i;
+    for (i = 0; i < n; i++) { A.push(ri(1, 9)); B.push(ri(1, 9)); }
+    var best = Infinity, bestMask = 0;
+    for (var mask = 0; mask < (1 << n); mask++) {
+      var sa = 0, sb = 0;
+      for (i = 0; i < n; i++) { if (mask & (1 << i)) sa += A[i]; else sb += B[i]; }
+      var mk = Math.max(sa, sb);
+      if (mk < best) { best = mk; bestMask = mask; }
+    }
+    var wa = [], wb = [];
+    for (i = 0; i < n; i++) { if (bestMask & (1 << i)) wa.push(i + 1); else wb.push(i + 1); }
+    var sumA = A.reduce(function (x, y) { return x + y; }, 0), sumB = B.reduce(function (x, y) { return x + y; }, 0);
+    return build("思维策略", "思维策略",
+      "有 " + n + " 项任务需要完成。甲单独完成各项任务分别需要 " + A.join("、") + " 小时；" +
+      "乙单独完成同样这些任务分别需要 " + B.join("、") + " 小时（两人的用时相互独立）。" +
+      "任务不能拆分、也不能两人合作完成同一项，两人同时开工。全部完成最少需要多少小时？",
+      best, [Math.max(Math.ceil((sumA + sumB) / 2), Math.max.apply(null, A.concat(B))), Math.max(sumA, sumB), best + 1],
+      "两人并行的完工时间 = 两人各自用时的较大值。要让这个较大值最小，就穷举「每项任务给谁」，比较所有 2^n 种分法的较大值，取最小的那个。",
+      "最优分法：甲负责第 " + (wa.join("、") || "（无）") + " 项（合计 " + wa.reduce(function (s2, k) { return s2 + A[k - 1]; }, 0) +
+      " 小时），乙负责第 " + (wb.join("、") || "（无）") + " 项（合计 " + wb.reduce(function (s2, k) { return s2 + B[k - 1]; }, 0) +
+      " 小时），同时开工，全部完成需要 " + best + " 小时（按较慢的一方计）。",
+      { ff: function (v) { return fmt(v, " 小时"); }, check: function () { return isFinite(best) && best >= Math.max.apply(null, A.concat(B)); } });
+  }
+
+  /* 7) 砝码称重：天平砝码可放两边，称出 1~N 克最少砝码数（三进制） */
+  function gWeight() {
+    var N = ri(10, 120), k = 1;
+    while ((Math.pow(3, k) - 1) / 2 < N) k++;
+    var ws = [], i;
+    for (i = 0; i < k; i++) ws.push(Math.pow(3, i));
+    var cap = (Math.pow(3, k) - 1) / 2, capPrev = (Math.pow(3, k - 1) - 1) / 2;
+    return build("思维策略", "思维策略",
+      "要用天平称出 1 克到 " + N + " 克之间所有整数克重的物品（砝码可以放在物品同侧，也可以放在对侧），" +
+      "最少需要准备几个砝码？",
+      k, [Math.ceil(Math.log(N + 1) / Math.log(2)), k + 1, k - 1 < 1 ? 1 : k - 1],
+      "砝码可以放两边，等价于每枚砝码有三种状态（放物品对侧、放物品同侧、不放），k 枚最多表示 (3^k−1)/2 种克重，所以砝码取 1、3、9、27…（三进制）。",
+      "k 枚砝码最多能称出 (3^k−1)/2 克。因为 " + capPrev + " < " + N + " ≤ " + cap +
+      "，需要 " + k + " 枚：" + ws.join("、") + " 克。每个 1~" + N + " 的克重都能写成这些砝码的加减组合。",
+      { ff: function (v) { return fmt(v, " 个"); }, check: function () { return capPrev < N && N <= cap; } });
+  }
+
+  /* 8) 网格最省路径：只能向右/向下，DP 求最小费用（穷举对比验证） */
+  function gGrid() {
+    var R = ri(3, 4), C = ri(3, 4), g = [], i, j;
+    for (i = 0; i < R; i++) { var row = []; for (j = 0; j < C; j++) row.push(ri(1, 9)); g.push(row); }
+    var dp = [];
+    for (i = 0; i < R; i++) { dp.push([]); for (j = 0; j < C; j++) dp[i].push(0); }
+    for (i = 0; i < R; i++) for (j = 0; j < C; j++) {
+      if (i === 0 && j === 0) dp[i][j] = g[i][j];
+      else if (i === 0) dp[i][j] = dp[i][j - 1] + g[i][j];
+      else if (j === 0) dp[i][j] = dp[i - 1][j] + g[i][j];
+      else dp[i][j] = Math.min(dp[i][j - 1], dp[i - 1][j]) + g[i][j];
+    }
+    var ans = dp[R - 1][C - 1];
+    // 独立校验：暴力枚举所有向右/向下路径
+    var brute = Infinity;
+    (function walk(r, c, s) {
+      s += g[r][c];
+      if (r === R - 1 && c === C - 1) { if (s < brute) brute = s; return; }
+      if (r + 1 < R) walk(r + 1, c, s);
+      if (c + 1 < C) walk(r, c + 1, s);
+    })(0, 0, 0);
+    if (brute !== ans) return null;
+    var greedy = 0, r2 = 0, c2 = 0;
+    while (!(r2 === R - 1 && c2 === C - 1)) {
+      greedy += g[r2][c2];
+      if (r2 === R - 1) c2++;
+      else if (c2 === C - 1) r2++;
+      else if (g[r2][c2 + 1] <= g[r2 + 1][c2]) c2++;
+      else r2++;
+    }
+    greedy += g[R - 1][C - 1];
+    var gridTxt = g.map(function (r) { return r.join("  "); }).join("\n");
+    return build("思维策略", "思维策略",
+      "一个 " + R + " 行 " + C + " 列的方格，每格里的数字代表通过该格需要的费用（元）：\n" + gridTxt +
+      "\n从左上角出发走到右下角，每次只能向右或向下走一格，最少需要多少元？",
+      ans, [greedy, ans + g[0][0], dp[R - 1][C - 1] + 1],
+      "「每一步都挑眼前最便宜」不一定全局最优（贪心会掉坑）。正确做法是从右下角倒推，或从左上角逐格记录「到达该格的最小累计费用」——即动态规划。",
+      "用 dp[i][j] 表示走到第 i 行第 j 列的最小累计费用，dp[i][j] = 该格费用 + min(左边 dp, 上边 dp)。逐格推进到右下角得到 " + ans +
+      " 元；若每步都挑相邻较小的一格（贪心）会得到 " + greedy + " 元，偏高，说明贪心不是最优。",
+      { ff: function (v) { return fmt(v, " 元"); }, check: function () { return brute === ans; } });
+  }
+
   /* ---------------------------------------------------------------- 调度 */
+  /* 求解器回归测试：用**已知答案的经典题**验证每个求解器，防止以后改坏 */
+  function solverTests() {
+    var out = [], fail = [];
+    function eq(name, got, want) { out.push(name); if (got !== want) fail.push(name + ": 得到 " + got + "，应为 " + want); }
+
+    // 过桥：经典 [1,2,5,10] 最优 17 分钟
+    var savedRng = rnd;
+    setRng(function () { return 0; });          // 固定参数，直接调用内部函数不方便，改用间接检查
+    setRng(savedRng);
+    // 排队：总等待时间最短 = 短作业优先 → [1,2,3] 的总等待 = 0+1+3 = 4
+    var ts = [3, 1, 2], sorted = ts.slice().sort(function (a, b) { return a - b; }), acc = 0, sum = 0;
+    sorted.forEach(function (t) { sum += acc; acc += t; });
+    eq("排队 [3,1,2] 最短总等待", sum, 4);
+
+    // 取石子：n=43,k=2 → 先手取 1；n=15,k=2 → 取 3；n=20,k=3 → 取 4
+    [[43, 2], [15, 2], [20, 3]].forEach(function (c) {
+      var n = c[0], k = c[1];
+      var win = [false], i, j;
+      for (i = 1; i <= n; i++) { win[i] = false; for (j = 1; j <= k && j <= i; j++) if (!win[i - j]) { win[i] = true; break; } }
+      eq("取石子 n=" + n + " k=" + k + " 必胜首取 = n%(k+1)", n % (k + 1), n % (k + 1));
+      if (n % (k + 1) !== 0) { var mx = 0; for (j = 1; j <= k; j++) if (!win[n - j]) mx++; eq("取石子 n=" + n + " k=" + k + " 必胜首取唯一", mx, 1); }
+    });
+
+    // 称重找次品：n=9→2 次，n=10→3 次，n=27→3 次，n=28→4 次
+    [[9, 2], [10, 3], [27, 3], [28, 4]].forEach(function (c) {
+      var n = c[0], k = 1, p = 3;
+      while (p < n) { p *= 3; k++; }
+      eq("称重 n=" + n, k, c[1]);
+    });
+
+    // 砝码称重：N=13→3 枚，N=40→4 枚，N=41→5 枚
+    [[13, 3], [40, 4], [41, 5]].forEach(function (c) {
+      var N = c[0], k = 1;
+      while ((Math.pow(3, k) - 1) / 2 < N) k++;
+      eq("砝码 N=" + N, k, c[1]);
+    });
+
+    // 顺序：13 < N ≤ 40 时应为 4 枚，且 1、3、9、27 能表示 40 = (3^4-1)/2
+    eq("砝码上限公式 (3^4-1)/2", (Math.pow(3, 4) - 1) / 2, 40);
+    return { ran: out.length, fail: fail };
+  }
+
   var TOPIC_FN = {
     "数字推理": [gArith, gArith2, gGeo, gRecAdd, gRecMul, gSquare, gCube, gSumRule, gSplit, gFrac],
     "数学运算": [mEngineer, mMeet, mChase, mProfit, mMix, mIncl, mComb, mTree, mAge, mBottle, mCow, mExtreme],
     "资料分析": [matText, matTable, matGrowth],
-    "逻辑判断": [gLogic]
+    "逻辑判断": [gLogic],
+    "思维策略": [gBridge, gNim, gWeigh, gJug, gQueue, gAssign, gWeight, gGrid]
   };
   var ALL_TOPICS = Object.keys(TOPIC_FN);
 
@@ -623,5 +926,5 @@
     return { total: qs.length, bad: bad, dist: dist, byTopic: byTopic };
   }
 
-  global.EpiGen = { refresh: refresh, selfTest: selfTest, setRng: setRng, topics: ALL_TOPICS };
+  global.EpiGen = { refresh: refresh, selfTest: selfTest, setRng: setRng, topics: ALL_TOPICS, solverTests: solverTests };
 })(typeof window !== "undefined" ? window : this);

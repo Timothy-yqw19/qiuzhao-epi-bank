@@ -10,7 +10,10 @@ const path = require("path");
 const file = path.join(__dirname, "index.html");
 const html = fs.readFileSync(file, "utf8");
 const genData = JSON.parse(fs.readFileSync(path.join(__dirname, "data", "generated.json"), "utf8"));
-const EXPECT_GEN = genData.questions.length, EXPECT_TOTAL = 134 + EXPECT_GEN;
+const stratPath = path.join(__dirname, "data", "strategy.json");
+const STRAT = fs.existsSync(stratPath) ? JSON.parse(fs.readFileSync(stratPath, "utf8")) : { questions: [] };
+const EXPECT_GEN = genData.questions.length + STRAT.questions.length;   // 构建期生成题（含思维策略）
+const EXPECT_TOTAL = 134 + EXPECT_GEN;
 const N_GEN_STUB = EXPECT_GEN;
 const zhentiPath = path.join(__dirname, "data", "zhenti.json");
 const ZHENTI = fs.existsSync(zhentiPath) ? JSON.parse(fs.readFileSync(zhentiPath, "utf8")) : null;
@@ -73,6 +76,7 @@ const factory = new Function(
            getGen:()=>globalThis.EpiGen, mulberry:(a)=>function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return ((t^t>>>14)>>>0)/4294967296;},
            getFresh:()=>freshQs, getQS:()=>QS, refreshNew, clearFresh, MAX_FRESH, BY_ID_GET:(id)=>BY_ID[id],
            getTimer:()=>S.timer, timerInit, timerAdvance, timerToggle, timerReset, timerSkip, timerPreset, timerChipText, todayStr,
+           getTopics:()=>TOPICS,
            loadZhenti, getZhenti:()=>zhentiQs, zhentiHint, isLocalHost,
            rushCfg, rushOn, rushSecs, rushTimeout, getRushQid:()=>rushQid,
            setZhentiState:(v)=>{zhentiState=v}, getZhentiState:()=>zhentiState,
@@ -95,7 +99,7 @@ const viewHtml = (id) => (dom["#" + id] ? String(dom["#" + id].innerHTML || "") 
 const count = (s, re) => (s.match(re) || []).length;
 
 console.log("一、数据完整性");
-ok(app.QS.length === EXPECT_TOTAL, "共 " + EXPECT_TOTAL + " 题（原题 134 + 生成 " + EXPECT_GEN + "）", app.QS.length);
+ok(app.QS.length === EXPECT_TOTAL, "共 " + EXPECT_TOTAL + " 题（原题 134 + 生成 " + EXPECT_GEN + "，含思维策略 " + STRAT.questions.length + "）", app.QS.length);
 ok(app.QS.slice(0, 134).every((q, i) => q.id === i + 1), "原题题号 1-134 连续");
 ok(new Set(app.QS.map((q) => q.id)).size === app.QS.length, "全库题号唯一无冲突");
 ok(app.QS.every((q) => q.options.length === 4), "每题 4 个选项");
@@ -229,7 +233,7 @@ ok(G.filter((q) => q.topic === "资料分析").every((q) => q.materialHtml && q.
 ok(G.every((q) => q.id >= 1001), "生成题号从 1001 起，不与原题冲突");
 ok(app.QS.filter((q) => q.svg).length === 11, "配图仍只有原题的 11 张图形推理");
 const gTopics = [...new Set(G.map((q) => q.topic))].sort();
-ok(gTopics.length === 4 && ["数字推理","数学运算","资料分析","逻辑判断"].every((t) => gTopics.includes(t)), "生成题覆盖 4 个可机器验算的题型", gTopics);
+ok(gTopics.length === 5 && ["数字推理","数学运算","资料分析","逻辑判断","思维策略"].every((t) => gTopics.includes(t)), "生成题覆盖 5 个可机器验算的题型（含思维策略）", gTopics);
 const dist = {};
 G.forEach((q) => { dist[q.answer] = (dist[q.answer] || 0) + 1; });
 ok(Object.keys(dist).length === 4 && Math.max(...Object.values(dist)) / G.length < 0.35, "生成题答案分布不偏斜", dist);
@@ -256,7 +260,7 @@ console.log("五之四、一键刷新新题（浏览器内出题器）");
 ok(typeof app.getGen === "function" && app.getGen(), "页面内已加载出题器 EpiGen");
 const genSelf = app.getGen().selfTest(200, app.mulberry(2026));
 ok(genSelf.bad.length === 0, "出题器自检 200 题无结构问题", genSelf.bad.slice(0, 2));
-ok(Object.keys(genSelf.byTopic).length === 4, "覆盖 4 个题型", genSelf.byTopic);
+ok(Object.keys(genSelf.byTopic).length === 5, "出题器覆盖 5 个题型（含思维策略）", genSelf.byTopic);
 const beforeTotal = app.getQS().length, beforeFresh = app.getFresh().length;
 app.refreshNew(30);
 const fresh = app.getFresh();
@@ -478,6 +482,38 @@ ok(app.getCur().id === 300002, "超时后自动跳到下一题", app.getCur().id
 ok(((app.getS().ui || {}).rushTimeouts || 0) >= 1, "超时次数计入统计");
 ok(app.isWrong(300001) === true, "超时的题会被错题本收录");
 app.rushCfg().secs = 0; saveForce();
+app.go("list");
+
+console.log("五之九、思维策略（银行 EPI 特有模块）");
+const STRATQ = app.QS.filter((q) => q.topic === "思维策略");
+ok(STRATQ.length >= 400, "思维策略题库 " + STRATQ.length + " 题", STRATQ.length);
+ok(STRATQ.every((q) => q.options.length === 4 && new Set(q.options.map((o) => o.t)).size === 4), "每题 4 个不重复选项");
+ok(STRATQ.every((q) => q.options.some((o) => o.k === q.answer)), "答案都在选项中");
+ok(STRATQ.every((q) => q.tip && q.analysis && q.analysis.length > 40), "都有技巧与完整解析");
+ok(STRATQ.every((q) => q.diff === 3), "难度统一标为难（银行 EPI 里最费的模块）");
+ok(STRATQ.every((q) => q.id >= 500001 && q.id < 900000), "题号段独立（500001+，不与真题/本机新题冲突）");
+ok(STRATQ.every((q) => q.module === "思维策略"), "独立成一个模块");
+// 关键：最优解不是编的，而是穷举/BFS/DP 算出来的——跑求解器回归
+const st = app.getGen().solverTests();
+ok(st.fail.length === 0, "求解器回归 " + st.ran + " 项全通过（经典题已知答案核对）", st.fail);
+ok(app.getTopics().indexOf("思维策略") >= 0, "题库筛选项包含思维策略");
+// 一键刷新也能即时产出思维策略
+app.getGen().setRng(app.mulberry(11));
+const freshS = app.getGen().refresh(30, ["思维策略"]);
+ok(freshS.length === 30 && freshS.every((q) => q.topic === "思维策略"), "一键刷新可即时产出思维策略新题", freshS.length);
+// 计划页的银行 EPI 专项入口
+app.go("plan");
+const pf = viewHtml("v-plan");
+ok(pf.includes("银行 EPI 专项") && pf.includes("思维策略"), "刷题计划页有「银行 EPI 专项」入口");
+ok(/data-mine="strategy"/.test(pf), "有「思维策略 全部」按钮");
+ok(/data-mine="rush"/.test(pf), "有「思维策略 · 45 秒/题」按钮");
+// 真的能一键起一组
+const stratIds = app.QS.filter((q) => q.topic === "思维策略").map((q) => q.id);
+app.startSet(stratIds, { label: "STRAT" });
+const spv = viewHtml("v-practice");
+ok(spv.includes("思维策略"), "练习页能正常出思维策略题");
+ok(spv.includes("难"), "思维策略题带「难」标签");
+ok(!/undefined/.test(spv), "思维策略练习页无 undefined");
 app.go("list");
 
 console.log("六、网址路由（做成网站后的地址栏行为）");

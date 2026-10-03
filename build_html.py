@@ -15,6 +15,7 @@ import re
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(HERE, "data", "questions.json")
 GEN = os.path.join(HERE, "data", "generated.json")
+STRAT = os.path.join(HERE, "data", "strategy.json")
 TPL = os.path.join(HERE, "app_template.html")
 GENJS = os.path.join(HERE, "app_gen.js")
 OUT = os.path.join(HERE, "index.html")
@@ -105,7 +106,14 @@ def main():
         for q in gen:
             q["src"] = "gen"
 
-    ids = [q["id"] for q in orig + gen]
+    strat = []
+    if os.path.exists(STRAT):                     # 思维策略（银行 EPI 特有模块）
+        with open(STRAT, encoding="utf-8") as f:
+            strat = json.load(f)["questions"]
+        for q in strat:
+            q["src"] = "gen"
+
+    ids = [q["id"] for q in orig + gen + strat]
     assert len(set(ids)) == len(ids), "题号冲突：原题与生成题 id 重叠"
 
     with_zhenti = "--with-zhenti" in sys.argv
@@ -118,8 +126,9 @@ def main():
 
     bank = {"meta": dict(data["meta"], origCount=len(orig), genCount=len(gen),
                          zhentiCount=len(zhenti), zhentiInlined=bool(zhenti),
-                         count=len(orig) + len(gen) + len(zhenti)),
-            "questions": orig + gen + zhenti}
+                         stratCount=len(strat),
+                         count=len(orig) + len(gen) + len(strat) + len(zhenti)),
+            "questions": orig + gen + strat + zhenti}
     appendix = {k: md_block(v) for k, v in data["appendix"].items()}
 
     with open(GENJS, encoding="utf-8") as f:
@@ -135,11 +144,12 @@ def main():
 
     size = os.path.getsize(target)
     if with_zhenti:
-        print("已生成 %s（%.1f MB，共 %d 题 = 原题 %d + 生成 %d + 真题 %d）—— 双击即可，无需起服务"
-              % (OUT_ZHENTI, size / 1048576, len(orig) + len(gen) + len(zhenti), len(orig), len(gen), len(zhenti)))
+        print("已生成 %s（%.1f MB，共 %d 题 = 原题 %d + 生成 %d（含思维策略 %d）+ 真题 %d）—— 双击即可，无需起服务"
+              % (OUT_ZHENTI, size / 1048576, len(orig) + len(gen) + len(strat) + len(zhenti),
+                 len(orig), len(gen) + len(strat), len(strat), len(zhenti)))
     else:
-        print("已生成 %s（%.1f KB，共 %d 题 = 原题 %d + 生成 %d，配图 %d 张）" % (
-            OUT, size / 1024, len(orig) + len(gen), len(orig), len(gen),
+        print("已生成 %s（%.1f KB，共 %d 题 = 原题 %d + 生成 %d（含思维策略 %d），配图 %d 张）" % (
+            OUT, size / 1024, len(orig) + len(gen) + len(strat), len(orig), len(gen) + len(strat), len(strat),
             sum(1 for q in orig + gen if q.get("svg"))))
     return 0
 
